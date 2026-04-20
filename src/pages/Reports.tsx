@@ -1,6 +1,6 @@
 import TopAppBar from "@/src/components/TopAppBar";
 import BottomNavBar from "@/src/components/BottomNavBar";
-import { BarChart3, Users, Award, ChevronRight, Search, Filter, ClipboardList, Trash2, Download, MessageSquare, RefreshCw, Unlock, FileText, Eye } from "lucide-react";
+import { BarChart3, Users, Award, ChevronRight, Search, ClipboardList, Trash2, Download, MessageSquare, RefreshCw, Unlock, FileText, Eye, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useQuiz, Participant, Quiz, Question } from "@/src/context/QuizContext";
 import { cn } from "@/src/lib/utils";
@@ -579,7 +579,7 @@ export default function Reports() {
                           onClick={() => setViewingQuestionPaper(false)}
                           className="p-2 hover:bg-surface-container-high rounded-full transition-colors"
                         >
-                          <Filter className="w-5 h-5 rotate-45" />
+                          <X className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
@@ -698,7 +698,7 @@ export default function Reports() {
                         onClick={() => setViewingSubmission(null)}
                         className="p-2 hover:bg-surface-container-high rounded-full transition-colors"
                       >
-                        <Filter className="w-5 h-5 rotate-45" />
+                        <X className="w-5 h-5" />
                       </button>
                     </div>
                     
@@ -739,7 +739,11 @@ export default function Reports() {
                                   {idx + 1}
                                 </span>
                                 <div>
-                                  <p className="font-headline font-bold text-on-surface text-lg">{q.text}</p>
+                                  <div className="prose prose-sm max-w-none text-on-surface font-headline font-bold text-lg">
+                                  <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeRaw, rehypeKatex]}>
+                                    {q.text}
+                                  </ReactMarkdown>
+                                </div>
                                   {q.image && (
                                     <div className="mt-2 mb-2">
                                       <img src={q.image} alt="Question" className="max-w-xs h-auto rounded-xl border border-outline-variant/10 shadow-sm" />
@@ -761,28 +765,32 @@ export default function Reports() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Student's Answer</p>
-                                <p className={cn(
-                                  "font-medium leading-relaxed",
+                                <div className={cn(
+                                  "font-medium leading-relaxed prose prose-sm max-w-none text-on-surface",
                                   q.type === 'Paragraph' ? "whitespace-pre-wrap" : ""
                                 )}>
-                                  {q.type === 'Paragraph' 
-                                    ? (studentAnswer || "No Answer")
-                                    : Array.isArray(studentAnswer) 
-                                      ? studentAnswer.map(label => `${getVisualLabel(label)}: ${q.options?.[label] || label}`).join(", ") 
-                                      : studentAnswer ? `${getVisualLabel(studentAnswer)}: ${q.options?.[studentAnswer] || studentAnswer}` : "No Answer"
-                                  }
-                                </p>
+                                  <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeRaw, rehypeKatex]}>
+                                    {q.type === 'Paragraph' 
+                                      ? (studentAnswer || "No Answer")
+                                      : Array.isArray(studentAnswer) 
+                                        ? studentAnswer.map(label => `${getVisualLabel(label)}: ${q.options?.[label] || label}`).join(", ") 
+                                        : studentAnswer ? `${getVisualLabel(studentAnswer)}: ${q.options?.[studentAnswer] || studentAnswer}` : "No Answer"
+                                    }
+                                  </ReactMarkdown>
+                                </div>
                               </div>
                               <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Correct Answer</p>
-                                <p className="font-medium">
-                                  {q.type === 'Paragraph'
-                                    ? "Manual Grading Required"
-                                    : Array.isArray(q.correctOption) 
-                                      ? q.correctOption.map(label => `${getVisualLabel(label)}: ${q.options?.[label] || label}`).join(", ") 
-                                      : `${getVisualLabel(q.correctOption)}: ${q.options?.[q.correctOption] || q.correctOption}`
-                                  }
-                                </p>
+                                <div className="font-medium prose prose-sm max-w-none text-on-surface">
+                                  <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeRaw, rehypeKatex]}>
+                                    {q.type === 'Paragraph'
+                                      ? "Manual Grading Required"
+                                      : Array.isArray(q.correctOption) 
+                                        ? q.correctOption.map(label => `${getVisualLabel(label)}: ${q.options?.[label] || label}`).join(", ") 
+                                        : `${getVisualLabel(q.correctOption)}: ${q.options?.[q.correctOption] || q.correctOption}`
+                                    }
+                                  </ReactMarkdown>
+                                </div>
                               </div>
                             </div>
 
@@ -827,7 +835,7 @@ export default function Reports() {
                       onClick={() => setGradingParticipant(null)}
                       className="p-2 hover:bg-surface-container-high rounded-full transition-colors"
                     >
-                      <Filter className="w-5 h-5 rotate-45" />
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
                   
@@ -922,9 +930,6 @@ export default function Reports() {
                   className="pl-10 pr-4 py-2.5 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all w-64"
                 />
               </div>
-              <button className="p-2.5 bg-surface-container-low border border-outline-variant/30 rounded-xl hover:bg-surface-container-high transition-colors">
-                <Filter className="w-5 h-5 text-on-surface-variant" />
-              </button>
             </div>
           </div>
         </header>

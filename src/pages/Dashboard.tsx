@@ -1,6 +1,6 @@
 import TopAppBar from "@/src/components/TopAppBar";
 import BottomNavBar from "@/src/components/BottomNavBar";
-import { Copy, Filter, Download, PlusCircle, Radio, Search, ArrowRight, Award, Info, Rocket, QrCode, X } from "lucide-react";
+import { Copy, Download, PlusCircle, Radio, Search, ArrowRight, Award, Info, Rocket, QrCode, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { QRCodeSVG } from 'qrcode.react';
 import { useQuiz, LOBBY_COUNTDOWN_SECONDS } from "@/src/context/QuizContext";
@@ -568,10 +568,6 @@ export default function Dashboard() {
           <div className="p-8 border-b border-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h3 className="font-headline text-2xl font-bold">Class List</h3>
             <div className="flex gap-2">
-              <button className="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-xl text-sm font-semibold hover:bg-surface-container transition-colors">
-                <Filter className="w-4 h-4" />
-                Filter
-              </button>
               <button className="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-xl text-sm font-semibold hover:bg-surface-container transition-colors">
                 <Download className="w-4 h-4" />
                 Export
