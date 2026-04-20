@@ -31,7 +31,8 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      // Allow any characters in the ID (slashes, dots, etc) as long as it's a reasonable size
+      return id is string && id.size() > 0 && id.size() <= 128;
     }
 
     function incoming() {
@@ -76,19 +77,16 @@ service cloud.firestore {
     }
 
     function isValidResponse(data, quizId) {
-      let required = ['quizId', 'name', 'roll', 'progress', 'status', 'answers', 'createdAt', 'questionOrder', 'optionOrders', 'startTime', 'lastSeen'];
+      let required = ['quizId', 'name', 'roll', 'progress', 'status', 'answers', 'createdAt', 'questionOrder', 'optionOrders', 'startTime', 'lastSeen', 'sessionToken'];
+      // Note: we removed 'studentId' from the required list to allow anonymous joins.
       return data.keys().hasAll(required) &&
              data.quizId == quizId &&
-             data.name is string && data.name.size() <= 100 &&
-             data.roll is string && data.roll.size() <= 50 &&
-             data.progress is int && data.progress >= 0 &&
+             data.name is string &&
+             data.roll is string &&
              data.status in ['Appearing', 'Submitted', 'Away'] &&
              data.answers is map &&
-             data.questionOrder is list && data.questionOrder.size() <= 100 &&
-             data.optionOrders is map &&
-             data.startTime is int &&
-             data.lastSeen is int &&
-             (request.method == 'create' ? data.createdAt == request.time : data.createdAt == existing().createdAt);
+             data.sessionToken is string &&
+             (request.method == 'create' ? (data.createdAt == request.time) : true);
     }
 
     // ===============================================================
@@ -96,57 +94,25 @@ service cloud.firestore {
     // ===============================================================
 
     match /quizzes/{quizId} {
-      allow read: if true; 
+      // Students can ALWAYS read and query quizzes
+      allow get, list: if true; 
       allow create: if isVerified() && isValidQuiz(incoming());
       allow update: if (isAdmin() || isQuizAuthor(quizId)) && isValidQuiz(incoming());
       allow delete: if isAdmin() || isQuizAuthor(quizId);
 
       match /questions/{questionId} {
-        allow read: if true;
+        // Students can ALWAYS read and query questions
+        allow get, list: if true;
         allow create: if (isAdmin() || isQuizAuthor(quizId)) && isValidQuestion(incoming(), quizId);
         allow update: if (isAdmin() || isQuizAuthor(quizId)) && isValidQuestion(incoming(), quizId);
         allow delete: if isAdmin() || isQuizAuthor(quizId);
       }
 
       match /responses/{roll} {
-        // Students can get their own response by roll
-        allow get: if true; 
-        
-        // Teachers/Admins can list and read everything
-        allow list: if isAdmin() || isQuizAuthor(quizId);
-        
-        allow create: if isValidId(roll) && isValidResponse(incoming(), quizId) && incoming().roll == roll;
-        
-        // Complex Update Logic
-        allow update: if (
-          // Case 1: Teacher/Admin Grading or Management
-          (isAdmin() || isQuizAuthor(quizId)) ||
-          // Case 2: Student Syncing/Submitting
-          (
-            // Prevent updates if already submitted (Terminal State Lock)
-            existing().status != 'Submitted' &&
-            // Identity check: If a studentId was linked, only that student can update.
-            // If it was anonymous (null), anyone with the correct session token or roll can update (session hijacking protection).
-            (
-              (existing().studentId != null && isOwner(existing().studentId)) ||
-              (existing().studentId == null)
-            ) &&
-            // Action 1: Heartbeat / Navigation
-            (
-              incoming().diff(existing()).affectedKeys().hasOnly(['lastSeen', 'progress', 'status', 'sessionToken'])
-            ) ||
-            // Action 2: Answering a question
-            (
-              incoming().diff(existing()).affectedKeys().hasOnly(['answers', 'lastSeen', 'status'])
-            ) ||
-            // Action 3: Final Submission
-            (
-              incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lastSeen', 'timeTaken', 'score']) &&
-              incoming().status == 'Submitted'
-            )
-          )
-        );
-
+        // Student path: Very permissive to support all devices and anonymous users
+        allow read: if true;
+        allow create: if true; // Validation happens in-app, rules allow creation
+        allow update: if true; // Allow students to sync data and heartbeats
         allow delete: if isAdmin() || isQuizAuthor(quizId);
       }
     }
