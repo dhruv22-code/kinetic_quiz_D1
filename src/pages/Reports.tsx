@@ -1,6 +1,6 @@
 import TopAppBar from "@/src/components/TopAppBar";
 import BottomNavBar from "@/src/components/BottomNavBar";
-import { BarChart3, Users, Clock, Award, ChevronRight, Search, Filter, ClipboardList, Trash2, Download, MessageSquare, RefreshCw, Unlock, FileText, Eye } from "lucide-react";
+import { BarChart3, Users, Award, ChevronRight, Search, Filter, ClipboardList, Trash2, Download, MessageSquare, RefreshCw, Unlock, FileText, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useQuiz, Participant, Quiz, Question } from "@/src/context/QuizContext";
 import { cn } from "@/src/lib/utils";
@@ -140,8 +140,7 @@ export default function Reports() {
     return {
       totalQuizzes: quizzes.length,
       totalParticipants,
-      avgScore: `${avgScore}%`,
-      avgTime: "N/A"
+      avgScore: `${avgScore}%`
     };
   }, [quizzes, allParticipants, quizQuestionsMap]);
 
@@ -931,12 +930,11 @@ export default function Reports() {
         </header>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           {[
             { label: "Total Quizzes", value: stats.totalQuizzes, icon: ClipboardList, color: "bg-blue-500" },
             { label: "Total Participants", value: stats.totalParticipants.toLocaleString(), icon: Users, color: "bg-purple-500" },
             { label: "Avg. Score", value: stats.avgScore, icon: Award, color: "bg-amber-500" },
-            { label: "Avg. Time", value: stats.avgTime, icon: Clock, color: "bg-emerald-500" },
           ].map((stat, i) => (
             <motion.div 
               key={stat.label}

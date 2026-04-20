@@ -67,6 +67,7 @@ export default function QuizEditor() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Dynamic Validation logic
@@ -247,6 +248,36 @@ export default function QuizEditor() {
     }]);
   };
 
+  const handleCopyText = (html: string, id: string) => {
+    // Strip HTML tags for cleaner copying
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = html;
+    const plainText = tempDiv.textContent || tempDiv.innerText || "";
+    
+    // Fallback if plain text is empty but there's content (e.g. image or just whitespace)
+    const finalText = plainText.trim() || "Question Content";
+
+    navigator.clipboard.writeText(finalText).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+      // Fallback for environment constraints
+      const textArea = document.createElement("textarea");
+      textArea.value = finalText;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+      } catch (copyErr) {
+        console.error('Fallback copy failed', copyErr);
+      }
+      document.body.removeChild(textArea);
+    });
+  };
+
   const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -354,9 +385,7 @@ export default function QuizEditor() {
   };
 
   const handleRemoveQuestion = (id: string) => {
-    if (questions.length > 1) {
-      setQuestions(questions.filter(q => q.id !== id));
-    }
+    setQuestions(questions.filter(q => q.id !== id));
   };
 
   const handleUpdateQuestion = (id: string, updates: Partial<typeof questions[0] & { type: string, timer: number }>) => {
@@ -722,8 +751,16 @@ export default function QuizEditor() {
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
-                <button className="p-2 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:text-primary transition-colors">
-                  <Copy className="w-5 h-5" />
+                <button 
+                  onClick={() => handleCopyText(q.text, q.id)}
+                  className="p-2 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:text-primary transition-colors flex items-center justify-center"
+                  title="Copy question text"
+                >
+                  {copiedId === q.id ? (
+                    <Check className="w-5 h-5 text-emerald-500 animate-in zoom-in duration-300" />
+                  ) : (
+                    <Copy className="w-5 h-5" />
+                  )}
                 </button>
               </div>
 
