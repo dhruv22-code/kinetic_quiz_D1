@@ -1,0 +1,163 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email in ["dhrubacollege15@gmail.com", "anujyounger66@gmail.com", "aditya@kinetic.edu"] ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Role Lookup for Quiz
+    function isQuizAuthor(quizId) {
+      return isVerified() && get(/databases/$(database)/documents/quizzes/$(quizId)).data.authorId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Validation Blueprints
+    // ===============================================================
+
+    function isValidQuiz(data) {
+      let required = ['title', 'totalQuestions', 'drawCount', 'roomCode', 'authorId', 'createdAt', 'isActive', 'status'];
+      return data.keys().hasAll(required) &&
+             data.title is string && data.title.size() <= 100 &&
+             data.totalQuestions is int && data.totalQuestions > 0 &&
+             data.drawCount is int && data.drawCount > 0 &&
+             data.roomCode is string && data.roomCode.size() <= 10 &&
+             data.authorId is string &&
+             data.isActive is bool &&
+             data.status in ['waiting', 'starting', 'active', 'finished'] &&
+             (request.method == 'create' ? data.createdAt == request.time : data.createdAt == existing().createdAt);
+    }
+
+    function isValidQuestion(data, quizId) {
+      let required = ['text', 'type', 'timer', 'options', 'correctOption', 'quizId'];
+      return data.keys().hasAll(required) &&
+             data.text is string && data.text.size() <= 5000 &&
+             data.type in ['Multiple Choice', 'True/False', 'Multiple Correct', 'Paragraph'] &&
+             data.timer is int && data.timer >= 0 &&
+             data.options is map &&
+             (data.correctOption is string || data.correctOption is list) &&
+             data.quizId == quizId;
+    }
+
+    function isValidResponse(data, quizId) {
+      let required = ['quizId', 'name', 'roll', 'progress', 'status', 'answers', 'createdAt', 'questionOrder', 'optionOrders', 'startTime', 'lastSeen'];
+      return data.keys().hasAll(required) &&
+             data.quizId == quizId &&
+             data.name is string && data.name.size() <= 100 &&
+             data.roll is string && data.roll.size() <= 50 &&
+             data.progress is int && data.progress >= 0 &&
+             data.status in ['Appearing', 'Submitted', 'Away'] &&
+             data.answers is map &&
+             data.questionOrder is list && data.questionOrder.size() <= 100 &&
+             data.optionOrders is map &&
+             data.startTime is int &&
+             data.lastSeen is int &&
+             (request.method == 'create' ? data.createdAt == request.time : data.createdAt == existing().createdAt);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /quizzes/{quizId} {
+      allow read: if true; 
+      allow create: if isVerified() && isValidQuiz(incoming());
+      allow update: if (isAdmin() || isQuizAuthor(quizId)) && isValidQuiz(incoming());
+      allow delete: if isAdmin() || isQuizAuthor(quizId);
+
+      match /questions/{questionId} {
+        allow read: if true;
+        allow create: if (isAdmin() || isQuizAuthor(quizId)) && isValidQuestion(incoming(), quizId);
+        allow update: if (isAdmin() || isQuizAuthor(quizId)) && isValidQuestion(incoming(), quizId);
+        allow delete: if isAdmin() || isQuizAuthor(quizId);
+      }
+
+      match /responses/{roll} {
+        // Students can get their own response by roll
+        allow get: if true; 
+        
+        // Teachers/Admins can list and read everything
+        allow list: if isAdmin() || isQuizAuthor(quizId);
+        
+        allow create: if isValidId(roll) && isValidResponse(incoming(), quizId) && incoming().roll == roll;
+        
+        // Complex Update Logic
+        allow update: if (
+          // Case 1: Teacher/Admin Grading or Management
+          (isAdmin() || isQuizAuthor(quizId)) ||
+          // Case 2: Student Syncing/Submitting
+          (
+            // Prevent updates if already submitted (Terminal State Lock)
+            existing().status != 'Submitted' &&
+            // Identity check: If a studentId was linked, only that student can update.
+            // If it was anonymous (null), anyone with the correct session token or roll can update (session hijacking protection).
+            (
+              (existing().studentId != null && isOwner(existing().studentId)) ||
+              (existing().studentId == null)
+            ) &&
+            // Action 1: Heartbeat / Navigation
+            (
+              incoming().diff(existing()).affectedKeys().hasOnly(['lastSeen', 'progress', 'status', 'sessionToken'])
+            ) ||
+            // Action 2: Answering a question
+            (
+              incoming().diff(existing()).affectedKeys().hasOnly(['answers', 'lastSeen', 'status'])
+            ) ||
+            // Action 3: Final Submission
+            (
+              incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lastSeen', 'timeTaken', 'score']) &&
+              incoming().status == 'Submitted'
+            )
+          )
+        );
+
+        allow delete: if isAdmin() || isQuizAuthor(quizId);
+      }
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) && (
+        !incoming().diff(existing()).affectedKeys().hasAny(['role']) || isAdmin()
+      );
+    }
+  }
+}
