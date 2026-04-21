@@ -10,12 +10,13 @@ import { useAuth } from "../context/AuthContext";
 import { useState, useEffect } from "react";
 
 export default function Dashboard() {
-  const { quiz, participants, loading, endQuiz, startSession } = useQuiz();
+  const { quiz, participants, loading, endQuiz, startSession, cancelStart } = useQuiz();
   const { profile } = useAuth();
   const [roomCode, setRoomCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showRevertConfirm, setShowRevertConfirm] = useState(false);
   const navigate = useNavigate();
 
   // Lobby countdown state for teacher
@@ -75,6 +76,13 @@ export default function Dashboard() {
     }
   };
 
+  const handleRevertToLobby = async () => {
+    if (quiz?.id) {
+      await cancelStart(quiz.id);
+      setShowRevertConfirm(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-surface min-h-screen pb-24 flex items-center justify-center">
@@ -127,7 +135,7 @@ export default function Dashboard() {
               <button 
                 onClick={() => navigate(`/join?code=${roomCode}`)}
                 disabled={!roomCode}
-                className="w-full py-6 bg-primary text-on-primary font-headline font-bold text-xl rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:hover:scale-100"
+                className="w-full py-6 bg-primary text-white font-headline font-bold text-xl rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:hover:scale-100"
               >
                 Join Quiz Session
                 <ArrowRight className="w-6 h-6" />
@@ -337,13 +345,21 @@ export default function Dashboard() {
             
             <div className="flex gap-3">
               {quiz.status === 'waiting' && (
-                <button 
-                  onClick={handleStartQuiz}
-                  className="px-8 h-14 rounded-2xl bg-primary text-on-primary font-headline font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                  <Rocket className="w-5 h-5 text-white" />
-                  Start Quiz
-                </button>
+                <>
+                  <button 
+                    onClick={() => navigate(`/quiz-editor?edit=${quiz.id}`)}
+                    className="px-6 h-14 rounded-2xl bg-surface-container-low text-on-surface font-headline font-bold hover:bg-surface-container transition-colors flex items-center justify-center gap-2"
+                  >
+                    Edit Quiz
+                  </button>
+                  <button 
+                    onClick={handleStartQuiz}
+                    className="px-8 h-14 rounded-2xl bg-primary text-white font-headline font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Rocket className="w-5 h-5 text-white" />
+                    Start Quiz
+                  </button>
+                </>
               )}
               <button 
                 onClick={() => setShowEndConfirm(true)}
@@ -422,6 +438,14 @@ export default function Dashboard() {
                 className="h-full bg-white"
               />
             </div>
+
+            <button 
+              onClick={() => setShowRevertConfirm(true)}
+              className="mt-4 px-6 py-3 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition-colors text-sm flex items-center gap-2"
+            >
+              <X className="w-4 h-4" />
+              Cancel Start
+            </button>
           </motion.div>
         )}
 
@@ -451,6 +475,39 @@ export default function Dashboard() {
                     className="flex-1 py-4 bg-error text-on-error font-headline font-bold rounded-xl shadow-lg shadow-error/20 hover:scale-[1.02] active:scale-95 transition-all"
                   >
                     End Quiz
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Revert Quiz Confirmation Modal */}
+        <AnimatePresence>
+          {showRevertConfirm && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm px-4">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-surface-container-lowest p-8 rounded-3xl shadow-2xl border border-surface-container max-w-md w-full"
+              >
+                <h3 className="font-headline text-2xl font-extrabold mb-4 text-on-surface">Revert to Lobby?</h3>
+                <p className="text-on-surface-variant mb-8 leading-relaxed text-sm">
+                  This will cancel the active session and take all students back to the waiting lobby. Their current progress in this attempt will be lost. Use this if you accidentally started the quiz.
+                </p>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setShowRevertConfirm(false)}
+                    className="flex-1 py-4 bg-surface-container text-on-surface font-bold rounded-xl hover:bg-surface-container-high transition-colors"
+                  >
+                    Stay Active
+                  </button>
+                  <button 
+                    onClick={handleRevertToLobby}
+                    className="flex-1 py-4 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/20"
+                  >
+                    Revert Now
                   </button>
                 </div>
               </motion.div>
@@ -567,12 +624,6 @@ export default function Dashboard() {
         >
           <div className="p-8 border-b border-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h3 className="font-headline text-2xl font-bold">Class List</h3>
-            <div className="flex gap-2">
-              <button className="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-xl text-sm font-semibold hover:bg-surface-container transition-colors">
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-            </div>
           </div>
           <div className="overflow-x-auto">
             {participants.length > 0 ? (

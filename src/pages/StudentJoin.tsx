@@ -1,12 +1,16 @@
 import TopAppBar from "@/src/components/TopAppBar";
 import BottomNavBar from "@/src/components/BottomNavBar";
+import ThemeToggle from "@/src/components/ThemeToggle";
 import { ArrowRight, Radio, Hourglass, CheckCircle2, Info, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuiz } from "@/src/context/QuizContext";
+import { useAuth } from "@/src/context/AuthContext";
 import { cn } from "@/src/lib/utils";
 import { useEffect } from "react";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from "@/src/firebase";
 
 export default function StudentJoin() {
   const [searchParams] = useSearchParams();
@@ -18,8 +22,51 @@ export default function StudentJoin() {
   const [isCodeValid, setIsCodeValid] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const { quiz, findQuizByRoomCode, joinQuiz, participants, isRollAllowed } = useQuiz();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const [history] = useState(() => JSON.parse(localStorage.getItem('quizHistory') || '[]'));
+  const [history] = useState(() => {
+    const saved = JSON.parse(localStorage.getItem('quizHistory') || '[]');
+    return [...saved].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  });
+  const [liveQuizzes, setLiveQuizzes] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      if (!name) setName(profile.full_name || "");
+      if (!roll) setRoll(profile.roll || "");
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    const checkLiveStatus = async () => {
+      if (history.length === 0) return;
+      setLoadingHistory(true);
+      const live: any[] = [];
+      
+      // We check until we find 3 live ones or finish the list
+      for (const item of history) {
+        if (live.length >= 3) break;
+        
+        try {
+          const quizDoc = await getDoc(doc(db, 'quizzes', item.id));
+          if (quizDoc.exists()) {
+            const data = quizDoc.data();
+            // Show only if not finished
+            if (data.status !== 'finished') {
+              live.push({ ...item, status: data.status });
+            }
+          }
+        } catch (err) {
+          console.error("Error checking live status:", err);
+        }
+      }
+      setLiveQuizzes(live);
+      setLoadingHistory(false);
+    };
+
+    checkLiveStatus();
+  }, [history]);
 
   useEffect(() => {
     const urlError = searchParams.get('error');
@@ -115,11 +162,22 @@ export default function StudentJoin() {
     }
   };
 
+  const handleHistoryClick = (item: any) => {
+    setCode(item.roomCode);
+    setError("");
+    validateCode(item.roomCode);
+    if (item.name) setName(item.name);
+    if (item.roll) setRoll(item.roll);
+  };
+
   return (
     <div className="bg-surface min-h-screen pb-24 flex flex-col">
       <TopAppBar />
       
       <main className="flex-grow flex items-center justify-center px-6 py-12 relative overflow-hidden">
+        <div className="absolute top-6 right-6 z-20">
+          <ThemeToggle />
+        </div>
         {/* Background Decorative Elements */}
         <div className="absolute top-[-10%] right-[-5%] w-[40rem] h-[40rem] rounded-full bg-primary-container/10 blur-[100px] -z-10"></div>
         <div className="absolute bottom-[-10%] left-[-5%] w-[35rem] h-[35rem] rounded-full bg-secondary-container/10 blur-[80px] -z-10"></div>
@@ -178,10 +236,37 @@ export default function StudentJoin() {
                       className="space-y-6 overflow-hidden"
                     >
                       <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl mb-6">
-                        <p className="text-emerald-800 text-sm font-bold flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4" />
-                          Room Found: <span className="underline">{quiz?.title}</span>
-                        </p>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-emerald-800 text-sm font-bold flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4" />
+                              Room Found: <span className="underline">{quiz?.title}</span>
+                            </p>
+                            <p className="text-[10px] text-emerald-600 font-bold uppercase mt-1">
+                              Status: {quiz?.status === 'waiting' ? 'In Lobby' : quiz?.status === 'starting' ? 'Starting...' : 'Active Session'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                             <div className="flex -space-x-2 mb-1 justify-end">
+                               {participants.slice(0, 3).map((p, i) => (
+                                 <div key={p.roll} className={cn(
+                                   "w-6 h-6 rounded-full ring-2 ring-emerald-50 flex items-center justify-center text-[8px] font-bold text-white",
+                                   ['bg-blue-400', 'bg-purple-400', 'bg-orange-400'][i % 3]
+                                 )}>
+                                   {p.name.charAt(0)}
+                                 </div>
+                               ))}
+                               {participants.length > 3 && (
+                                 <div className="w-6 h-6 rounded-full ring-2 ring-emerald-50 bg-emerald-200 flex items-center justify-center text-[8px] font-bold text-emerald-700">
+                                   +{participants.length - 3}
+                                 </div>
+                               )}
+                             </div>
+                             <div className="text-[8px] font-bold text-emerald-600 uppercase tracking-tighter">
+                               {participants.length} Joining
+                             </div>
+                          </div>
+                        </div>
                       </div>
 
                       <div>
@@ -229,7 +314,7 @@ export default function StudentJoin() {
                     className={cn(
                       "w-full py-4 px-6 rounded-xl font-headline font-bold text-lg flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg",
                       isCodeValid 
-                        ? "bg-primary text-on-primary shadow-primary/20" 
+                        ? "bg-primary text-white shadow-primary/20" 
                         : "bg-surface-container-highest text-on-surface-variant opacity-50 cursor-not-allowed"
                     )}
                   >
@@ -240,7 +325,7 @@ export default function StudentJoin() {
               </div>
             </motion.div>
 
-            {history.length > 0 && (
+            {liveQuizzes.length > 0 && (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -249,18 +334,28 @@ export default function StudentJoin() {
               >
                 <h3 className="font-headline font-bold text-sm uppercase tracking-widest text-on-surface-variant mb-4 flex items-center gap-2">
                   <Hourglass className="w-4 h-4" />
-                  Recent Quizzes
+                  Live Recent Quizzes
                 </h3>
                 <div className="space-y-3">
-                  {history.map((item: any) => (
+                  {liveQuizzes.map((item: any) => (
                     <button
                       key={item.id}
-                      onClick={() => setCode(item.roomCode)}
+                      onClick={() => handleHistoryClick(item)}
                       className="w-full flex items-center justify-between p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/5 hover:border-primary/30 transition-all group text-left"
                     >
-                      <div>
+                      <div className="flex-1">
                         <div className="font-bold text-on-surface group-hover:text-primary transition-colors">{item.title}</div>
-                        <div className="text-[10px] text-on-surface-variant uppercase tracking-wider font-bold">{item.roomCode}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <div className="text-[10px] text-on-surface-variant uppercase tracking-wider font-bold">{item.roomCode}</div>
+                          <div className="text-[9px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 rounded-md font-bold uppercase tracking-tighter">
+                            {item.status === 'waiting' ? 'In Lobby' : item.status === 'starting' ? 'Starting' : 'Active'}
+                          </div>
+                          {item.name && (
+                            <div className="text-[9px] text-on-surface-variant opacity-60 flex items-center gap-1">
+                              • <span>{item.name}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <ArrowRight className="w-4 h-4 text-outline-variant group-hover:text-primary transition-colors" />
                     </button>

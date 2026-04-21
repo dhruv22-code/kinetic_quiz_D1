@@ -1,13 +1,15 @@
 import TopAppBar from "@/src/components/TopAppBar";
 import BottomNavBar from "@/src/components/BottomNavBar";
-import { User, Mail, Shield, Settings, LogOut, Edit2, Calendar, Award, BookOpen, Globe, ChevronRight, Radio, Lock, Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react";
+import { User, Mail, Shield, Settings, LogOut, Edit2, Calendar, Award, BookOpen, Globe, ChevronRight, Radio, Lock, Eye, EyeOff, Loader2, CheckCircle2, Camera } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { useAuth } from "../context/AuthContext";
 import { useQuiz, Participant, Quiz, Question } from "../context/QuizContext";
-import React, { useState, useEffect, useMemo } from "react";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "../firebase";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { collection, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage, handleFirestoreError, OperationType, isDemoMode } from "../firebase";
+import ThemeToggle from "../components/ThemeToggle";
 
 export default function Profile() {
   const { user, profile, signOut, refreshProfile, changePassword } = useAuth();
@@ -27,6 +29,14 @@ export default function Profile() {
   });
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    console.log("Firebase Connection Status:", isDemoMode ? "DEMO MODE" : "CONNECTED");
+    console.log("Storage Bucket:", storage.app.options.storageBucket);
+  }, []);
 
   useEffect(() => {
     const fetchParticipants = async () => {
@@ -100,7 +110,8 @@ export default function Profile() {
     full_name: profile?.full_name || '',
     bio: profile?.bio || '',
     department: profile?.department || '',
-    role: profile?.role || 'Educator'
+    role: profile?.role || 'Educator',
+    roll: profile?.roll || ''
   });
 
   const handleUpdateProfile = async () => {
@@ -115,6 +126,72 @@ export default function Profile() {
       handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (isDemoMode) {
+      alert("Profile picture upload is not available in Demo Mode. Please set up Firebase to enable this feature.");
+      return;
+    }
+
+    // Basic validation
+    if (!file.type.startsWith('image/')) {
+      alert("Please upload an image file (e.g., JPEG, PNG, WEBP).");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image size should be less than 2MB.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setUploadError(null);
+    try {
+      // 1. Upload to Storage
+      const fileName = `${user.uid}_${Date.now()}`;
+      const avatarRef = ref(storage, `avatars/${fileName}`);
+      
+      console.log('Attempting upload to:', `avatars/${fileName}`);
+      const uploadResult = await uploadBytes(avatarRef, file, { contentType: file.type });
+      console.log('Upload bytes successful:', uploadResult.metadata.fullPath);
+      
+      // 2. Get URL
+      const downloadUrl = await getDownloadURL(avatarRef);
+      console.log('Download URL generated:', downloadUrl);
+      
+      // 3. Update Firestore
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, { 
+        avatar_url: downloadUrl,
+        updated_at: serverTimestamp ? serverTimestamp() : new Date()
+      });
+      
+      await refreshProfile();
+      alert("Profile picture updated successfully!");
+    } catch (err: any) {
+      console.error('Avatar upload detail error:', err);
+      let message = "Failed to upload image.";
+      
+      if (err.code === 'storage/unauthorized') {
+        message = "Permission denied. Please ensure you have enabled Firebase Storage in your console and deployed the rules.";
+      } else if (err.code === 'storage/quota-exceeded') {
+        message = "Storage quota exceeded.";
+      } else if (err.code === 'storage/canceled') {
+        message = "Upload canceled.";
+      } else if (err.message?.includes('network')) {
+        message = "Network error. Please check your connection.";
+      }
+      
+      const detailedError = `${message} (Code: ${err.code || 'unknown'})`;
+      setUploadError(detailedError);
+      console.error(detailedError, err);
+    } finally {
+      setUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -170,6 +247,9 @@ export default function Profile() {
       <TopAppBar />
       
       <main className="flex-grow p-6 md:p-12 max-w-5xl mx-auto w-full">
+        <div className="flex justify-end mb-4">
+          <ThemeToggle />
+        </div>
         {isEditing ? (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -212,6 +292,26 @@ export default function Profile() {
                 </div>
               </div>
 
+              <AnimatePresence>
+                {editedProfile.role === 'Student' && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2 overflow-hidden"
+                  >
+                    <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">Roll Number</label>
+                    <input 
+                      type="text" 
+                      value={editedProfile.roll}
+                      onChange={(e) => setEditedProfile({...editedProfile, roll: e.target.value})}
+                      className="w-full px-5 py-4 bg-surface-container-low border border-outline-variant/30 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      placeholder="Enter your roll number"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">Department / Class</label>
                 <input 
@@ -242,7 +342,7 @@ export default function Profile() {
                 <button 
                   onClick={handleUpdateProfile}
                   disabled={loading}
-                  className="flex-1 py-4 bg-primary text-on-primary font-bold rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+                  className="flex-1 py-4 bg-primary text-white font-bold rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
                 >
                   {loading ? "Saving..." : "Save Changes"}
                 </button>
@@ -259,28 +359,63 @@ export default function Profile() {
               >
                 <div className="absolute -inset-1 bg-gradient-to-br from-primary to-secondary rounded-full blur opacity-25 group-hover:opacity-50 transition-opacity"></div>
                 <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-surface-container shadow-xl">
+                  {uploadingAvatar ? (
+                    <div className="absolute inset-0 bg-surface-container-high/80 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                  ) : null}
                   <img 
                     src={teacherInfo.avatar} 
                     alt={teacherInfo.name} 
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                    accept="image/*"
+                  />
                 </div>
                 <button 
-                  onClick={() => setIsEditing(true)}
-                  className="absolute bottom-2 right-2 p-2.5 bg-primary text-on-primary rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute bottom-2 right-2 p-2.5 bg-primary text-on-primary rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-50"
+                  title="Upload profile picture"
                 >
-                  <Edit2 className="w-5 h-5" />
+                  <Camera className="w-5 h-5" />
                 </button>
               </motion.div>
 
               <div className="flex-grow text-center md:text-left">
+                {uploadError && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mb-4 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs font-medium"
+                  >
+                    {uploadError}
+                  </motion.div>
+                )}
+                {uploadingAvatar && (
+                  <div className="mb-4 flex items-center gap-2 text-primary text-xs font-bold animate-pulse">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    UPLOADING IMAGE...
+                  </div>
+                )}
                 <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
                   <h1 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight">{teacherInfo.name}</h1>
                   <span className="px-4 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2 self-center md:self-auto">
                     <Shield className="w-3 h-3" />
                     {teacherInfo.role}
                   </span>
+                  {profile.role === 'Student' && profile.roll && (
+                    <span className="px-4 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2 self-center md:self-auto">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Roll: {profile.roll}
+                    </span>
+                  )}
                 </div>
                 
                 <div className="flex flex-wrap justify-center md:justify-start gap-6 mb-6">
@@ -474,7 +609,7 @@ export default function Profile() {
                           <button 
                             type="submit"
                             disabled={loading}
-                            className="flex-1 py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="flex-1 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                           >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Update"}
                           </button>

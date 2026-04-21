@@ -139,7 +139,7 @@ export default function Login() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full py-4 bg-primary text-on-primary font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
+            className="w-full py-4 bg-primary text-white font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Sign In</span>}
             {!loading && <ArrowRight className="w-5 h-5" />}
@@ -209,7 +209,7 @@ export default function Login() {
                         setResetSuccess(false);
                         setResetEmail("");
                       }}
-                      className="w-full py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all"
+                      className="w-full py-4 bg-primary text-white font-bold rounded-xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all"
                     >
                       Back to Login
                     </button>
@@ -249,7 +249,7 @@ export default function Login() {
                       <button 
                         type="submit"
                         disabled={loading}
-                        className="flex-1 py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="flex-1 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Send Link"}
                       </button>

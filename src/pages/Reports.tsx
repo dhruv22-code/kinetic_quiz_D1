@@ -28,6 +28,8 @@ export default function Reports() {
   const [gradingValues, setGradingValues] = useState<Record<string, number>>({});
   const [viewingSubmission, setViewingSubmission] = useState<Participant | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [selectedQuizIds, setSelectedQuizIds] = useState<string[]>([]);
+  const [isBulkDelete, setIsBulkDelete] = useState(false);
   const [showQueriesOnly, setShowQueriesOnly] = useState(false);
   const [viewingQuestionPaper, setViewingQuestionPaper] = useState(false);
   const { gradeParticipant } = useQuiz();
@@ -113,7 +115,7 @@ export default function Reports() {
   }, [selectedQuiz?.id]);
 
   const getParticipantPercentage = (participant: Participant, quiz: Quiz) => {
-    const questionsCount = quiz.totalQuestions || quiz.questions?.length || 0;
+    const questionsCount = quiz.drawCount || quiz.totalQuestions || quiz.questions?.length || 0;
     if (questionsCount === 0) return 0;
     
     // Use saved score if available, otherwise 0
@@ -157,11 +159,11 @@ export default function Reports() {
   const getQuizStats = (quiz: Quiz) => {
     const participants = allParticipants.filter(p => p.quizId === quiz.id);
     const submitted = participants.filter(p => p.status === 'Submitted' || p.isDisqualified);
-    const totalQuestions = quiz.totalQuestions || 0;
+    const denominator = quiz.drawCount || quiz.totalQuestions || 0;
     
     let totalRawScore = 0;
     let maxRawScore = 0;
-    let minRawScore = submitted.length > 0 ? totalQuestions : 0;
+    let minRawScore = submitted.length > 0 ? denominator : 0;
 
     submitted.forEach(p => {
       const rawScore = p.score || 0;
@@ -171,7 +173,7 @@ export default function Reports() {
     });
 
     const avgRawScore = submitted.length > 0 ? Math.round((totalRawScore / submitted.length) * 100) / 100 : 0;
-    const avgPercentage = totalQuestions > 0 ? Math.round((avgRawScore / totalQuestions) * 100) : 0;
+    const avgPercentage = denominator > 0 ? Math.round((avgRawScore / denominator) * 100) : 0;
     
     return {
       count: participants.length,
@@ -179,98 +181,9 @@ export default function Reports() {
       avgPercentage,
       maxRawScore,
       minRawScore: submitted.length > 0 ? minRawScore : 0,
-      totalQuestions: totalQuestions,
+      denominator,
       date: quiz.createdAt ? (quiz.createdAt.toDate ? quiz.createdAt.toDate().toLocaleDateString() : new Date(quiz.createdAt).toLocaleDateString()) : 'N/A'
     };
-  };
-
-  const handleExportData = (quiz: Quiz) => {
-    const quizId = quiz.id;
-    if (!quizId) return;
-
-    const participants = allParticipants.filter(p => p.quizId === quizId);
-    const questions = quizQuestionsMap[quizId] || quiz.questions || [];
-    const stats = getQuizStats(quiz);
-
-    // 1. Student Details Export (JSON)
-    const studentData = participants.map(p => {
-      const rawScore = getRawScore(p, quiz, questions);
-      const responses: Record<string, any> = {};
-      questions.forEach((q, idx) => {
-        const key = `Q${idx + 1}: ${q.text}`;
-        const answer = p.answers[q.id];
-        const optionOrder = p.optionOrders?.[q.id] || ['A', 'B', 'C', 'D'];
-        const getVisualLabel = (label: string) => {
-          const vIdx = optionOrder.indexOf(label);
-          return vIdx !== -1 ? String.fromCharCode(65 + vIdx) : label;
-        };
-
-        if (!answer) {
-          responses[key] = "No Answer";
-        } else if (q.type === 'Paragraph') {
-          responses[key] = answer;
-        } else if (Array.isArray(answer)) {
-          responses[key] = answer.map(label => {
-            const visual = getVisualLabel(label);
-            const optionText = q.options?.[label] || label;
-            return `${visual}: ${optionText}`;
-          }).join(", ");
-        } else {
-          const visual = getVisualLabel(answer);
-          const optionText = q.options?.[answer] || answer;
-          responses[key] = `${visual}: ${optionText}`;
-        }
-      });
-      
-      return {
-        Name: p.name,
-        RollNumber: p.roll,
-        MarksScored: `${rawScore}/${questions.length}`,
-        Status: p.status,
-        TimeTaken: p.timeTaken ? `${p.timeTaken}s` : 'N/A',
-        Responses: responses
-      };
-    });
-
-    const studentBlob = new Blob([JSON.stringify(studentData, null, 2)], { type: 'application/json' });
-    const studentUrl = URL.createObjectURL(studentBlob);
-    const studentLink = document.createElement('a');
-    studentLink.href = studentUrl;
-    studentLink.download = `Student_Report_${quiz.title.replace(/\s+/g, '_')}.json`;
-    document.body.appendChild(studentLink);
-    studentLink.click();
-    document.body.removeChild(studentLink);
-
-    // 2. Quiz Metadata Export (JSON)
-    const metadata = {
-      QuizTitle: quiz.title,
-      RoomCode: quiz.roomCode,
-      TotalQuestions: quiz.totalQuestions,
-      TotalStudentsAttended: stats.count,
-      TopperMarks: `${stats.maxRawScore}/${questions.length}`,
-      LowestMarks: `${stats.minRawScore}/${questions.length}`,
-      AverageScore: `${stats.avgRawScore}/${questions.length}`,
-      Questions: questions.map((q, idx) => ({
-        Number: idx + 1,
-        Text: q.text,
-        Type: q.type,
-        Options: q.options,
-        CorrectAnswer: q.type === 'Paragraph' ? "Manual Grading" : (
-          Array.isArray(q.correctOption) 
-            ? q.correctOption.map(label => `${label}: ${q.options[label] || label}`).join(", ") 
-            : `${q.correctOption}: ${q.options[q.correctOption] || q.correctOption}`
-        )
-      }))
-    };
-
-    const metaBlob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
-    const metaUrl = URL.createObjectURL(metaBlob);
-    const metaLink = document.createElement('a');
-    metaLink.href = metaUrl;
-    metaLink.download = `Quiz_Metadata_${quiz.title.replace(/\s+/g, '_')}.json`;
-    document.body.appendChild(metaLink);
-    metaLink.click();
-    document.body.removeChild(metaLink);
   };
 
   const handleDownloadQuestionPaper = (quiz: Quiz) => {
@@ -309,6 +222,41 @@ export default function Reports() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedQuizIds.length === 0) return;
+    
+    setLoadingParticipants(true);
+    try {
+      for (const id of selectedQuizIds) {
+        await deleteQuiz(id);
+      }
+      setRefreshTrigger(prev => prev + 1);
+      setSelectedQuizIds([]);
+      setIsBulkDelete(false);
+      setShowDeleteConfirm(null);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'quizzes');
+    } finally {
+      setLoadingParticipants(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedQuizIds.length === filteredQuizzes.length) {
+      setSelectedQuizIds([]);
+    } else {
+      setSelectedQuizIds(filteredQuizzes.map(q => q.id!));
+    }
+  };
+
+  const toggleSelectQuiz = (quizId: string) => {
+    setSelectedQuizIds(prev => 
+      prev.includes(quizId) 
+        ? prev.filter(id => id !== quizId) 
+        : [...prev, quizId]
+    );
   };
 
   const handleDeleteQuiz = async (quizId: string) => {
@@ -375,14 +323,6 @@ export default function Reports() {
                     View Question Paper
                   </button>
                   <button 
-                    onClick={() => handleExportData(selectedQuiz)}
-                    disabled={selectedQuiz.isActive}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export Data
-                  </button>
-                  <button 
                     onClick={() => setShowDeleteConfirm(selectedQuiz.id || null)}
                     disabled={selectedQuiz.isActive}
                     className="flex items-center gap-2 px-4 py-2 bg-error/10 text-error rounded-xl font-bold text-sm hover:bg-error/20 transition-all disabled:opacity-50"
@@ -397,7 +337,7 @@ export default function Reports() {
                   <p className="text-xs font-label font-bold uppercase tracking-widest text-on-surface-variant mb-1">Average Score</p>
                   <p className="text-3xl font-headline font-black text-primary">
                     {getQuizStats(selectedQuiz).avgRawScore}
-                    <span className="text-sm text-on-surface-variant/50 ml-1">/{selectedQuiz.totalQuestions}</span>
+                    <span className="text-sm text-on-surface-variant/50 ml-1">/{selectedQuiz.drawCount || selectedQuiz.totalQuestions}</span>
                   </p>
                 </div>
                 <div className="w-px h-12 bg-outline-variant/30 mx-2"></div>
@@ -475,7 +415,7 @@ export default function Reports() {
                             <td className="px-6 py-5 font-body text-on-surface-variant">{p.roll}</td>
                             <td className="px-6 py-5">
                               <span className="text-sm font-medium text-on-surface-variant">
-                                {p.progress + 1}/{selectedQuiz.totalQuestions}
+                                {p.progress + 1}/{selectedQuiz.drawCount || selectedQuiz.totalQuestions}
                               </span>
                             </td>
                             <td className="px-6 py-5">
@@ -492,7 +432,7 @@ export default function Reports() {
                                     p.isDisqualified ? "text-error/60" : (score >= 80 ? "text-emerald-600" : score >= 50 ? "text-amber-600" : "text-error")
                                   )}>{score}%</span>
                                   <span className="text-[10px] text-on-surface-variant font-bold">
-                                    {p.score || 0}/{selectedQuiz.totalQuestions}
+                                    {p.score || 0}/{selectedQuiz.drawCount || selectedQuiz.totalQuestions}
                                   </span>
                                 </div>
                               </div>
@@ -963,30 +903,71 @@ export default function Reports() {
         <div className="bg-surface-container-lowest rounded-3xl border border-outline-variant/10 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-outline-variant/10 flex items-center justify-between">
             <h2 className="font-headline font-bold text-xl text-on-surface">Recent Quiz Performance</h2>
-            <button className="text-primary font-label font-bold text-sm hover:underline">Export All Data</button>
+            <AnimatePresence>
+              {selectedQuizIds.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="flex items-center gap-4"
+                >
+                  <span className="text-sm font-bold text-primary">{selectedQuizIds.length} Selected</span>
+                  <button 
+                    onClick={() => {
+                      setIsBulkDelete(true);
+                      setShowDeleteConfirm("bulk");
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-error/10 text-error rounded-xl font-bold text-sm hover:bg-error transition-all hover:text-white"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Selected
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low/50">
+                  <th className="px-6 py-4 w-12">
+                    <input 
+                      type="checkbox"
+                      checked={filteredQuizzes.length > 0 && selectedQuizIds.length === filteredQuizzes.length}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-outline focus:ring-primary text-primary"
+                    />
+                  </th>
                   <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Quiz Name</th>
                   <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Room Code</th>
                   <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Participants</th>
                   <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Avg. Score</th>
                   <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Status</th>
-                  <th className="px-6 py-4"></th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
                 {filteredQuizzes.length > 0 ? filteredQuizzes.map((quiz) => {
                   const qStats = getQuizStats(quiz);
+                  const isSelected = selectedQuizIds.includes(quiz.id!);
                   return (
                     <tr 
                       key={quiz.id} 
                       onClick={() => setSelectedQuiz(quiz)}
-                      className="hover:bg-surface-container-low/30 transition-colors group cursor-pointer"
+                      className={cn(
+                        "hover:bg-surface-container-low/30 transition-colors group cursor-pointer",
+                        isSelected && "bg-primary/5"
+                      )}
                     >
+                      <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                        <input 
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectQuiz(quiz.id!)}
+                          className="w-4 h-4 rounded border-outline focus:ring-primary text-primary"
+                        />
+                      </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
@@ -1007,7 +988,7 @@ export default function Reports() {
                           <div className="h-full bg-primary rounded-full" style={{ width: `${qStats.avgPercentage}%` }}></div>
                         </div>
                         <span className="text-xs font-label font-bold text-primary mt-1 block">
-                          {qStats.avgRawScore}/{quiz.totalQuestions}
+                          {qStats.avgRawScore}/{quiz.drawCount || quiz.totalQuestions}
                         </span>
                       </td>
                       <td className="px-6 py-5">
@@ -1020,17 +1001,6 @@ export default function Reports() {
                       </td>
                       <td className="px-6 py-5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleExportData(quiz);
-                            }}
-                            disabled={quiz.isActive}
-                            className="p-2 rounded-lg hover:bg-primary/10 text-on-surface-variant hover:text-primary transition-colors disabled:opacity-30"
-                            title="Export Data"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1076,19 +1046,32 @@ export default function Reports() {
               exit={{ opacity: 0, scale: 0.9 }}
               className="bg-surface-container-lowest p-8 rounded-3xl shadow-2xl border border-surface-container max-w-md w-full"
             >
-              <h3 className="font-headline text-2xl font-extrabold mb-4 text-on-surface">Delete Quiz?</h3>
+              <h3 className="font-headline text-2xl font-extrabold mb-4 text-on-surface">
+                {isBulkDelete ? `Delete ${selectedQuizIds.length} Quizzes?` : "Delete Quiz?"}
+              </h3>
               <p className="text-on-surface-variant mb-8 leading-relaxed">
-                Are you sure you want to delete this quiz and all its reports? This action is permanent and cannot be undone.
+                {isBulkDelete 
+                  ? "Are you sure you want to delete all selected quizzes and their reports? This action is permanent and cannot be undone."
+                  : "Are you sure you want to delete this quiz and all its reports? This action is permanent and cannot be undone."}
               </p>
               <div className="flex gap-4">
                 <button 
-                  onClick={() => setShowDeleteConfirm(null)}
+                  onClick={() => {
+                    setShowDeleteConfirm(null);
+                    setIsBulkDelete(false);
+                  }}
                   className="flex-1 py-4 bg-surface-container-low text-on-surface font-headline font-bold rounded-xl hover:bg-surface-container transition-all"
                 >
                   Cancel
                 </button>
                 <button 
-                  onClick={() => handleDeleteQuiz(showDeleteConfirm)}
+                  onClick={() => {
+                    if (isBulkDelete) {
+                      handleBulkDelete();
+                    } else {
+                      handleDeleteQuiz(showDeleteConfirm);
+                    }
+                  }}
                   className="flex-1 py-4 bg-error text-on-error font-headline font-bold rounded-xl shadow-lg shadow-error/20 hover:scale-[1.02] active:scale-95 transition-all"
                 >
                   Delete

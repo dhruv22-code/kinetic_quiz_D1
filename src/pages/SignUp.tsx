@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { motion } from 'motion/react';
-import { Mail, Lock, UserPlus, Chrome, ArrowRight, Loader2, User, AtSign, Eye, EyeOff, Briefcase } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Mail, Lock, UserPlus, Chrome, ArrowRight, Loader2, User, AtSign, Eye, EyeOff, Briefcase, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
 export default function SignUp() {
@@ -10,6 +10,7 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
+  const [roll, setRoll] = useState('');
   const [role, setRole] = useState('teacher');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -22,7 +23,7 @@ export default function SignUp() {
     setLoading(true);
     setError(null);
     try {
-      await signUpWithEmail(email, password, name, username, role);
+      await signUpWithEmail(email, password, name, username, role, roll);
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || "Failed to create account.");
@@ -116,13 +117,37 @@ export default function SignUp() {
               >
                 <option value="teacher">Teacher / Educator</option>
                 <option value="admin">Administrator</option>
-                <option value="student">Student (Developer/TA)</option>
+                <option value="student">Student</option>
               </select>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-outline">
                 <ArrowRight className="w-4 h-4 rotate-90" />
               </div>
             </div>
           </div>
+
+          <AnimatePresence>
+            {role === 'student' && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-2 overflow-hidden"
+              >
+                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Roll Number</label>
+                <div className="relative group">
+                  <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
+                  <input 
+                    type="text" 
+                    required
+                    value={roll}
+                    onChange={(e) => setRoll(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
+                    placeholder="2024-STUDENT-001"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Password</label>
@@ -159,7 +184,7 @@ export default function SignUp() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full py-4 bg-primary text-on-primary font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
+            className="w-full py-4 bg-primary text-white font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Sign Up</span>}
             {!loading && <ArrowRight className="w-5 h-5" />}

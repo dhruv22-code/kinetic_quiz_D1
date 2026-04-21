@@ -185,7 +185,7 @@ export default function Onboarding() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full py-5 bg-primary text-on-primary font-headline font-bold text-lg rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+            className="w-full py-5 bg-primary text-white font-headline font-bold text-lg rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
           >
             {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <span>Start Your Journey</span>}
             {!loading && <ArrowRight className="w-6 h-6" />}

@@ -17,6 +17,7 @@ import SignUp from "./pages/SignUp";
 import Onboarding from "./pages/Onboarding";
 import { QuizProvider } from "./context/QuizContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -62,50 +63,52 @@ function RootRedirect() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <QuizProvider>
-        <Router>
-          <div className="min-h-screen flex flex-col">
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/join" element={<StudentJoin />} />
-              <Route path="/quiz" element={<StudentQuiz />} />
-              <Route path="/score" element={<StudentScore />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <QuizProvider>
+          <Router>
+            <div className="min-h-screen flex flex-col">
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/join" element={<StudentJoin />} />
+                <Route path="/quiz" element={<StudentQuiz />} />
+                <Route path="/score" element={<StudentScore />} />
 
-              {/* Protected Routes */}
-              <Route path="/" element={<RootRedirect />} />
-              <Route path="/onboarding" element={
-                <ProtectedRoute>
-                  <Onboarding />
-                </ProtectedRoute>
-              } />
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/reports" element={
-                <ProtectedRoute>
-                  <Reports />
-                </ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              <Route path="/quiz-editor" element={
-                <ProtectedRoute>
-                  <QuizEditor />
-                </ProtectedRoute>
-              } />
-              <Route path="*" element={<Navigate to="/join" replace />} />
-            </Routes>
-          </div>
-        </Router>
-      </QuizProvider>
-    </AuthProvider>
+                {/* Protected Routes */}
+                <Route path="/" element={<RootRedirect />} />
+                <Route path="/onboarding" element={
+                  <ProtectedRoute>
+                    <Onboarding />
+                  </ProtectedRoute>
+                } />
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/reports" element={
+                  <ProtectedRoute>
+                    <Reports />
+                  </ProtectedRoute>
+                } />
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } />
+                <Route path="/quiz-editor" element={
+                  <ProtectedRoute>
+                    <QuizEditor />
+                  </ProtectedRoute>
+                } />
+                <Route path="*" element={<Navigate to="/join" replace />} />
+              </Routes>
+            </div>
+          </Router>
+        </QuizProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -24,6 +24,7 @@ interface Profile {
   bio: string;
   department: string;
   role: string;
+  roll?: string;
   updated_at: any;
 }
 
@@ -34,7 +35,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string, name: string, username: string, role: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, name: string, username: string, role: string, roll?: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -79,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               bio: '',
               department: '',
               role: 'teacher',
+              roll: '',
               updated_at: serverTimestamp(),
             };
             setDoc(profileRef, initialProfile);
@@ -166,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUpWithEmail = async (email: string, password: string, name: string, username: string, role: string) => {
+  const signUpWithEmail = async (email: string, password: string, name: string, username: string, role: string, roll?: string) => {
     if (isDemoMode) {
       const mockUser = { uid: 'demo-' + Date.now(), displayName: name, email };
       const mockProfile: Profile = {
@@ -177,6 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bio: '',
         department: '',
         role,
+        roll: roll || '',
         updated_at: new Date().toISOString()
       };
       setUser(mockUser);
@@ -202,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bio: '',
         department: '',
         role: role,
+        roll: roll || '',
         updated_at: serverTimestamp(),
       };
       await setDoc(profileRef, initialProfile);

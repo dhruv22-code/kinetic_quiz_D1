@@ -14,7 +14,8 @@ import {
   setDoc,
   deleteDoc,
   limit,
-  runTransaction
+  runTransaction,
+  writeBatch
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, isDemoMode } from '../firebase';
 import { useAuth } from './AuthContext';
@@ -119,11 +120,14 @@ interface QuizContextType {
   saveDraft: (draft: Partial<Quiz>) => void;
   deleteDraft: (title: string) => void;
   clearCurrentDraft: () => void;
+  updateQuiz: (quizId: string, quiz: Quiz) => Promise<void>;
+  fetchQuizById: (quizId: string) => Promise<Quiz | null>;
   joinQuiz: (participant: Omit<Participant, 'id' | 'progress' | 'status' | 'answers' | 'questionOrder' | 'optionOrders'>, targetQuiz?: Quiz) => Promise<void>;
   updateParticipant: (roll: string, updates: Partial<Participant>) => Promise<void>;
   leaveLobby: (roll: string) => Promise<void>;
   endQuiz: (quizId: string) => Promise<void>;
   startSession: (quizId: string) => Promise<void>;
+  cancelStart: (quizId: string) => Promise<void>;
   findQuizByRoomCode: (code: string) => Promise<Quiz | null>;
   gradeParticipant: (quizId: string, participantId: string, manualGrades: Record<string, number>) => Promise<void>;
   calculateScore: (participant: Participant, quiz: Quiz, overrideQuestions?: Question[], excludeParagraphs?: boolean) => number;
@@ -528,6 +532,106 @@ export function QuizProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('quizDraft');
   };
 
+  const updateQuiz = async (quizId: string, updatedQuiz: Quiz) => {
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    if (isDemoMode) {
+      const quizData = {
+        ...updatedQuiz,
+        id: quizId,
+        authorId: user.uid,
+        updatedAt: new Date().toISOString()
+      };
+      mockStore.saveQuiz(quizData);
+      setQuizzes(prev => prev.map(q => q.id === quizId ? quizData : q));
+      if (quiz?.id === quizId) setQuiz(quizData);
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+      const quizRef = doc(db, 'quizzes', quizId);
+      const quizData = sanitizeForFirestore({
+        title: updatedQuiz.title,
+        totalQuestions: updatedQuiz.totalQuestions,
+        drawCount: updatedQuiz.drawCount,
+        customTimer: updatedQuiz.customTimer,
+        allowedRollPatterns: updatedQuiz.allowedRollPatterns || [],
+        updatedAt: serverTimestamp(),
+      });
+
+      batch.update(quizRef, quizData);
+      
+      // Update questions
+      // Firestore doesn't support deleting a whole collection in a batch without knowing the IDs
+      // So we still need to fetch IDs, but we can delete/add in the same batch
+      const questionsRef = collection(db, 'quizzes', quizId, 'questions');
+      const oldQuestions = await getDocs(questionsRef);
+      
+      for (const d of oldQuestions.docs) {
+        batch.delete(doc(db, 'quizzes', quizId, 'questions', d.id));
+      }
+
+      for (const question of updatedQuiz.questions) {
+        const questionData = sanitizeForFirestore({ ...question, quizId });
+        delete (questionData as any).id;
+        // In a batch, we use doc() with a new ID if we don't have one
+        const newQuestionRef = doc(collection(db, 'quizzes', quizId, 'questions'));
+        batch.set(newQuestionRef, questionData);
+      }
+
+      await batch.commit();
+
+      // Re-fetch questions to have stable IDs if needed, or just rely on merged
+      const mergedQuiz = {
+        ...(quiz?.id === quizId ? quiz : {}),
+        ...updatedQuiz,
+        id: quizId,
+        authorId: user.uid
+      };
+      
+      // Update local statePlural
+      setQuizzes(prev => prev.map(q => q.id === quizId ? mergedQuiz : q));
+      if (quiz?.id === quizId) setQuiz(mergedQuiz);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `quizzes/${quizId}`);
+      throw err;
+    }
+  };
+
+  const fetchQuizById = async (quizId: string): Promise<Quiz | null> => {
+    if (isDemoMode) {
+      return mockStore.getQuizzes().find((q: any) => q.id === quizId) || null;
+    }
+    try {
+      const quizRef = doc(db, 'quizzes', quizId);
+      const quizSnap = await getDoc(quizRef);
+      
+      if (!quizSnap.exists()) return null;
+      
+      const quizData = quizSnap.data() as Quiz;
+      
+      // Fetch questions subcollection
+      const questionsRef = collection(db, 'quizzes', quizId, 'questions');
+      const questionsSnap = await getDocs(questionsRef);
+      const questions = questionsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Question[];
+      
+      return {
+        ...quizData,
+        id: quizSnap.id,
+        questions
+      };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, `quizzes/${quizId}`);
+      return null;
+    }
+  };
+
   const resetQuiz = () => {
     setQuiz(null);
     setParticipants([]);
@@ -679,15 +783,22 @@ export function QuizProvider({ children }: { children: ReactNode }) {
       
       // Save to history (outside transaction)
       const history = JSON.parse(localStorage.getItem('quizHistory') || '[]');
-      if (!history.find((h: any) => h.id === activeQuiz.id)) {
-        history.push({
-          id: activeQuiz.id,
-          title: activeQuiz.title,
-          roomCode: activeQuiz.roomCode,
-          date: new Date().toISOString()
-        });
-        localStorage.setItem('quizHistory', JSON.stringify(history.slice(-10)));
+      const existingHistoryIndex = history.findIndex((h: any) => h.id === activeQuiz.id);
+      
+      const historyItem = {
+        id: activeQuiz.id,
+        title: activeQuiz.title,
+        roomCode: activeQuiz.roomCode,
+        name: p.name,
+        roll: p.roll,
+        date: new Date().toISOString()
+      };
+
+      if (existingHistoryIndex !== -1) {
+        history.splice(existingHistoryIndex, 1);
       }
+      history.unshift(historyItem);
+      localStorage.setItem('quizHistory', JSON.stringify(history.slice(0, 10)));
     } catch (err: any) {
       if (err.message === "user already joined" || err.message === "already participated") {
         throw err;
@@ -756,6 +867,26 @@ export function QuizProvider({ children }: { children: ReactNode }) {
         }
       }, (LOBBY_COUNTDOWN_SECONDS + 0.5) * 1000);
 
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `quizzes/${quizId}`);
+    }
+  };
+
+  const cancelStart = async (quizId: string) => {
+    if (isDemoMode) {
+      const quizzes = mockStore.getQuizzes();
+      const updated = quizzes.map((q: any) => q.id === quizId ? { ...q, status: 'waiting', startedAt: null } : q);
+      localStorage.setItem('demo_quizzes', JSON.stringify(updated));
+      const activeQuiz = updated.find((q: any) => q.id === quizId);
+      if (activeQuiz) setQuiz(activeQuiz);
+      return;
+    }
+    try {
+      const quizRef = doc(db, 'quizzes', quizId);
+      await updateDoc(quizRef, { 
+        status: 'waiting', 
+        startedAt: null 
+      });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `quizzes/${quizId}`);
     }
@@ -947,7 +1078,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <QuizContext.Provider value={{ quiz, quizzes, participants, currentStudentRoll, draftQuiz, drafts, createQuiz, resetQuiz, saveDraft, deleteDraft, clearCurrentDraft, joinQuiz, updateParticipant, leaveLobby, endQuiz, startSession, findQuizByRoomCode, gradeParticipant, calculateScore, deleteQuiz, isRollAllowed, resetParticipantSession, quizEnded, closeQuizEndedMessage, loading }}>
+    <QuizContext.Provider value={{ quiz, quizzes, participants, currentStudentRoll, draftQuiz, drafts, createQuiz, resetQuiz, saveDraft, deleteDraft, clearCurrentDraft, updateQuiz, fetchQuizById, joinQuiz, updateParticipant, leaveLobby, endQuiz, startSession, cancelStart, findQuizByRoomCode, gradeParticipant, calculateScore, deleteQuiz, isRollAllowed, resetParticipantSession, quizEnded, closeQuizEndedMessage, loading }}>
       {children}
     </QuizContext.Provider>
   );

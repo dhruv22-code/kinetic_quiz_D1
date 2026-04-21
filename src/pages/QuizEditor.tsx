@@ -51,24 +51,57 @@ export default function QuizEditor() {
     saveDraft, 
     deleteDraft,
     clearCurrentDraft,
+    updateQuiz,
+    fetchQuizById,
     draftQuiz, 
     drafts,
     quizzes, 
     quizEnded, 
     closeQuizEndedMessage 
   } = useQuiz();
-  const [title, setTitle] = useState("");
+
+  const getAutoSave = () => {
+    try {
+      const saved = localStorage.getItem('quizEditor_autoSave');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const autoSave = getAutoSave();
+
+  const [title, setTitle] = useState(autoSave?.title || "");
   const activeQuiz = quizzes.find(q => q.isActive);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<any[]>(autoSave?.questions || []);
   const totalQuestions = questions.length;
-  const [drawCount, setDrawCount] = useState(0);
-  const [defaultTimer, setDefaultTimer] = useState(43);
-  const [hasManuallySetDrawCount, setHasManuallySetDrawCount] = useState(false);
+  const [drawCount, setDrawCount] = useState(autoSave?.drawCount || 0);
+  const [defaultTimer, setDefaultTimer] = useState(autoSave?.customTimer || 43);
+  const [hasManuallySetDrawCount, setHasManuallySetDrawCount] = useState(autoSave?.hasManuallySetDrawCount || false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [allowedRollPatterns, setAllowedRollPatterns] = useState<string[]>(autoSave?.allowedRollPatterns || []);
+  const [newPattern, setNewPattern] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-save logic to persist working progress
+  useEffect(() => {
+    const workingDraft = {
+      title,
+      questions,
+      drawCount,
+      customTimer: defaultTimer,
+      allowedRollPatterns,
+      hasManuallySetDrawCount
+    };
+    
+    // Only save if there's actually content
+    if (questions.length > 0 || title.trim()) {
+      localStorage.setItem('quizEditor_autoSave', JSON.stringify(workingDraft));
+    }
+  }, [title, questions, drawCount, defaultTimer, allowedRollPatterns, hasManuallySetDrawCount]);
 
   // Dynamic Validation logic
   const getValidationIssues = useCallback(() => {
@@ -137,38 +170,37 @@ export default function QuizEditor() {
   const validationIssues = getValidationIssues();
   const hasValidationErrors = validationIssues.length > 0;
 
-  const [allowedRollPatterns, setAllowedRollPatterns] = useState<string[]>([]);
-  const [newPattern, setNewPattern] = useState("");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  const isEditing = !!editId;
+  const hasLoadedEditRef = useRef(false);
 
+  // Load quiz for editing if requested
   useEffect(() => {
-    if (draftQuiz) {
-      if (draftQuiz.title) setTitle(draftQuiz.title);
-      if (draftQuiz.drawCount) {
-        setDrawCount(draftQuiz.drawCount);
-        setHasManuallySetDrawCount(true);
-      }
-      if (draftQuiz.allowedRollPatterns) {
-        setAllowedRollPatterns(draftQuiz.allowedRollPatterns);
-      }
-      if (draftQuiz.questions) {
-        setQuestions(draftQuiz.questions.map(q => ({
-          id: q.id,
-          text: q.text,
-          type: q.type || "Multiple Choice",
-          timer: q.timer || 45,
-          correctOption: q.correctOption || null,
-          options: {
-            A: q.options.A || "",
-            B: q.options.B || "",
-            C: q.options.C || "",
-            D: q.options.D || "",
+    if (editId && !hasLoadedEditRef.current) {
+      const loadEditQuiz = async () => {
+        const target = await fetchQuizById(editId);
+        if (target) {
+          setTitle(target.title || "");
+          setDrawCount(target.drawCount || 0);
+          setAllowedRollPatterns(target.allowedRollPatterns || []);
+          setDefaultTimer(target.customTimer || 45);
+          if (target.questions) {
+            setQuestions(target.questions.map(q => ({
+              ...q,
+              type: q.type || "Multiple Choice",
+              timer: q.timer || target.customTimer || 45,
+              options: q.options || { A: "", B: "", C: "", D: "" }
+            })));
+            setHasManuallySetDrawCount(true);
           }
-        })));
-      }
+          hasLoadedEditRef.current = true;
+        }
+      };
+      loadEditQuiz();
     }
-  }, [draftQuiz]);
+  }, [editId, fetchQuizById]);
 
   const handleReset = () => {
     setTitle("");
@@ -177,6 +209,7 @@ export default function QuizEditor() {
     setAllowedRollPatterns([]);
     setHasManuallySetDrawCount(false);
     clearCurrentDraft();
+    localStorage.removeItem('quizEditor_autoSave');
     setValidationError(null);
   };
 
@@ -423,13 +456,49 @@ export default function QuizEditor() {
       return;
     }
 
-    if (activeQuiz) {
+    if (activeQuiz && (!isEditing || activeQuiz.id !== editId)) {
       setValidationError("You already have an active quiz session. Please end it from the dashboard before creating a new one.");
       return;
     }
 
     setValidationError(null);
     setIsSaving(true);
+    console.log("Starting handleSave, isEditing:", isEditing, "editId:", editId);
+
+    if (isEditing && editId) {
+      try {
+        const currentQuiz = quizzes.find(q => q.id === editId);
+        await updateQuiz(editId, {
+          title,
+          totalQuestions,
+          drawCount,
+          roomCode: currentQuiz?.roomCode || "",
+          customTimer: defaultTimer,
+          questions: questions.map(q => ({
+            id: q.id,
+            text: q.text,
+            image: q.image,
+            type: q.type || "Multiple Choice",
+            timer: q.timer,
+            options: q.options,
+            correctOption: q.correctOption || ""
+          })),
+          allowedRollPatterns,
+          isActive: true,
+          status: 'waiting'
+        });
+        console.log("Update successful, clearing auto-save and navigating");
+        localStorage.removeItem('quizEditor_autoSave');
+        setIsSaving(false);
+        navigate("/dashboard");
+        return;
+      } catch (error: any) {
+        console.error("Failed to update quiz:", error);
+        setValidationError(error.message || "An error occurred while updating the quiz.");
+        setIsSaving(false);
+        return;
+      }
+    }
 
     // Generate a random 6-digit room code: 123-456
     const digits = Math.floor(100000 + Math.random() * 900000).toString();
@@ -458,6 +527,7 @@ export default function QuizEditor() {
       });
       
       console.log("Quiz created successfully");
+      localStorage.removeItem('quizEditor_autoSave');
       navigate("/dashboard");
     } catch (error: any) {
       console.error("Failed to create quiz:", error);
@@ -476,10 +546,12 @@ export default function QuizEditor() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               <span className="text-sm font-semibold uppercase tracking-widest text-primary mb-2 block font-label">Assessment Builder</span>
-              <h1 className="text-5xl font-extrabold font-headline tracking-tighter text-on-surface">Create New Quiz</h1>
+              <h1 className="text-5xl font-extrabold font-headline tracking-tighter text-on-surface">
+                {isEditing ? "Edit Quiz" : "Create New Quiz"}
+              </h1>
             </div>
             <div className="flex gap-3">
-              {activeQuiz && (
+              {activeQuiz && (!isEditing || activeQuiz.id !== editId) && (
                 <div className="hidden lg:flex items-center px-4 py-2 bg-error/10 text-error text-xs font-bold rounded-lg border border-error/20 max-w-xs">
                   An active quiz is already running. End it to create a new one.
                 </div>
@@ -499,15 +571,15 @@ export default function QuizEditor() {
               </button>
               <button 
                 onClick={handleSave}
-                disabled={!!activeQuiz || isSaving || hasValidationErrors}
+                disabled={(!!activeQuiz && (!isEditing || activeQuiz.id !== editId)) || isSaving || hasValidationErrors}
                 className={cn(
                   "px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95",
-                  (!!activeQuiz || isSaving || hasValidationErrors)
+                  (!!activeQuiz && (!isEditing || activeQuiz.id !== editId) || isSaving || hasValidationErrors)
                     ? "bg-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed grayscale"
                     : "bg-gradient-to-r from-primary to-primary-dim text-white shadow-primary/20 hover:scale-[1.02]"
                 )}
               >
-                <span>{isSaving ? "Saving..." : "Generate Room Code & Save"}</span>
+                <span>{isSaving ? "Saving..." : (isEditing ? "Update & Save" : "Generate Room Code & Save")}</span>
                 {hasValidationErrors ? (
                   <Check className="w-5 h-5 opacity-20" /> // Using Check as a dummy icon when grayed
                 ) : (
