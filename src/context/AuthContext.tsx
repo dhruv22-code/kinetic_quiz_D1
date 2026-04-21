@@ -62,16 +62,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isDemoMode) return;
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    
+    let unsubscribeProfile: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setUser(user);
+      
+      // Cleanup previous profile listener if it exists
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
       if (user) {
-        // Subscribe to profile changes
+        console.log('User signed in, fetching profile for:', user.uid);
         const profileRef = doc(db, 'users', user.uid);
-        const unsubscribeProfile = onSnapshot(profileRef, (doc) => {
+        
+        unsubscribeProfile = onSnapshot(profileRef, (doc) => {
           if (doc.exists()) {
             setProfile(doc.data() as Profile);
           } else {
-            // Create initial profile if it doesn't exist
+            console.log('Profile not found, creating initial profile for:', user.uid);
             const initialProfile: Profile = {
               id: user.uid,
               full_name: user.displayName || '',
@@ -83,23 +94,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               roll: '',
               updated_at: serverTimestamp(),
             };
-            setDoc(profileRef, initialProfile);
+            setDoc(profileRef, initialProfile).catch(err => {
+              console.error('Error creating profile:', err);
+            });
             setProfile(initialProfile);
           }
           setLoading(false);
         }, (error) => {
-          console.error('Error fetching profile:', error);
+          console.error(`Error fetching profile for ${user.uid}:`, error.message);
+          // If permission error, maybe log more auth state
+          if (error.message.includes('permission')) {
+            console.warn('Authentication token might be stale or rules are too restrictive.');
+          }
           setLoading(false);
         });
-
-        return () => unsubscribeProfile();
       } else {
         setProfile(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
   }, []);
 
   const signOut = async () => {

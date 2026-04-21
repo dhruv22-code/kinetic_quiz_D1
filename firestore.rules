@@ -25,8 +25,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.get('email', '') in ["dhrubacollege15@gmail.com", "anujyounger66@gmail.com", "aditya@kinetic.edu"] ||
-        (isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)))
+        request.auth.token.email in ["dhrubacollege15@gmail.com", "anujyounger66@gmail.com", "aditya@kinetic.edu"] ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
 
@@ -117,14 +117,22 @@ service cloud.firestore {
       }
     }
 
+    function isValidUser(data) {
+      let required = ['id', 'full_name', 'username', 'avatar_url', 'bio', 'department', 'role', 'updated_at'];
+      return data.keys().hasAll(required) &&
+             data.id is string &&
+             data.full_name is string && data.full_name.size() <= 100 &&
+             data.role in ['teacher', 'admin', 'student', 'Educator', 'Student'];
+    }
+
     // User Profiles
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && (
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if (isOwner(userId) || isAdmin()) && (
         !incoming().diff(existing()).affectedKeys().hasAny(['role']) || isAdmin()
       );
+      allow delete: if isAdmin();
     }
   }
 }
