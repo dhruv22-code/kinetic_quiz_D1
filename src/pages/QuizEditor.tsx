@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
 import { useQuiz, Quiz } from "@/src/context/QuizContext";
+import { useAuth } from "@/src/context/AuthContext";
 import AIChatAssistant from "@/src/components/AIChatAssistant";
 
 import ReactMarkdown from 'react-markdown';
@@ -71,6 +72,7 @@ export default function QuizEditor() {
 
   const autoSave = getAutoSave();
 
+  const { profile } = useAuth();
   const [title, setTitle] = useState(autoSave?.title || "");
   const activeQuiz = quizzes.find(q => q.isActive);
   const [questions, setQuestions] = useState<any[]>(autoSave?.questions || []);
@@ -182,6 +184,12 @@ export default function QuizEditor() {
       const loadEditQuiz = async () => {
         const target = await fetchQuizById(editId);
         if (target) {
+          // Security Check: Only the author can edit
+          if (target.authorId && profile?.id && target.authorId !== profile.id) {
+            console.warn("Unauthorized edit attempt blocked.");
+            navigate('/dashboard');
+            return;
+          }
           setTitle(target.title || "");
           setDrawCount(target.drawCount || 0);
           setAllowedRollPatterns(target.allowedRollPatterns || []);

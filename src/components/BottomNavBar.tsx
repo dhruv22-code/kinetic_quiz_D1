@@ -7,7 +7,7 @@ export default function BottomNavBar() {
   const location = useLocation();
   const { profile } = useAuth();
 
-  const isStudent = profile?.role === 'Student';
+  const isStudent = profile?.role?.toLowerCase() === 'student';
 
   const navItems = isStudent ? [
     { icon: LayoutDashboard, label: "Home", path: "/dashboard" },

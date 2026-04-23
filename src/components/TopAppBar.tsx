@@ -50,7 +50,7 @@ export default function TopAppBar({ variant = "standard", progress, currentTask,
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full group">
+    <header className="fixed top-0 left-0 right-0 z-50 w-full group">
       {isDemoMode && (
         <div className="bg-tertiary text-on-tertiary-container py-2 px-6 flex items-center justify-center gap-2 text-xs font-bold font-label">
           <Info className="w-3.5 h-3.5" />

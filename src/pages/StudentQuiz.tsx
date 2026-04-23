@@ -4,7 +4,7 @@ import { Info, CheckCircle2, Loader2, AlertCircle, X, Bot } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import React, { useState, useEffect } from "react";
 import { useQuiz, LOBBY_COUNTDOWN_SECONDS } from "@/src/context/QuizContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useBlocker } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
 import { Rocket, Trophy, Clock } from "lucide-react";
 
@@ -79,13 +79,50 @@ export default function StudentQuiz() {
   useEffect(() => {
     if (participant) {
       if (participant.cheatingAttempts !== undefined && participant.cheatingAttempts > cheatAttempts) {
-        setCheatAttempts(participant.cheatingAttempts);
+        const incomingAttempts = participant.cheatingAttempts;
+        setCheatAttempts(incomingAttempts);
+        
+        // Auto-show warning if they just re-entered with 1 strike
+        if (incomingAttempts === 1 && !showCheatWarning && !isFinished && !isDisqualified) {
+          setShowCheatWarning(true);
+        }
       }
       if (participant.isDisqualified && !isDisqualified) {
         setIsDisqualified(true);
       }
     }
   }, [participant?.cheatingAttempts, participant?.isDisqualified]);
+
+  // Internal Navigation Blocker (Detect going back or navigating away)
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      !isFinished && 
+      !isDisqualified && 
+      quiz?.status === 'active' &&
+      currentLocation.pathname !== nextLocation.pathname
+  );
+
+  useEffect(() => {
+    if (blocker.state === "blocked") {
+      const triggerNavStrike = async () => {
+        const newAttempts = cheatAttemptsRef.current + 1;
+        setCheatAttempts(newAttempts);
+        
+        if (newAttempts === 1) {
+          setShowCheatWarning(true);
+          if (currentStudentRoll) {
+            await updateParticipant(currentStudentRoll, { cheatingAttempts: 1 });
+          }
+          // We let them proceed (leave) because the user wants to allow "going outside and re-entering"
+          blocker.proceed?.();
+        } else {
+          await handleDisqualification();
+          blocker.proceed?.();
+        }
+      };
+      triggerNavStrike();
+    }
+  }, [blocker.state, currentStudentRoll, isFinished, isDisqualified]);
 
   // Tab Exclusivity Check (BroadcastChannel prevents multiple tabs of the same user)
   useEffect(() => {
@@ -186,22 +223,31 @@ export default function StudentQuiz() {
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      // Focus more on visibilityState for mobile reliability
+      if (document.hidden || document.visibilityState === 'hidden') {
         handleCheatAttempt();
       }
     };
 
     const handleBlur = () => {
-      // Small delay to prevent false positives during certain UI transitions if any
-      handleCheatAttempt();
+      // Blur is noisy but catches window switching
+      // Add a tiny delay to ignore temporary focus flutters
+      setTimeout(() => {
+        if (!document.hasFocus()) {
+          handleCheatAttempt();
+        }
+      }, 100);
     };
 
     window.addEventListener('blur', handleBlur);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    // popstate catch for browser back/forward buttons
+    window.addEventListener('popstate', handleCheatAttempt);
 
     return () => {
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('popstate', handleCheatAttempt);
     };
   }, [currentStudentRoll, isFinished, quizEnded, isDisqualified, quiz?.status, showCheatWarning]);
 
@@ -674,7 +720,7 @@ export default function StudentQuiz() {
   const isExpired = questionTimeLeft === 0;
 
   return (
-    <div className="bg-surface min-h-screen pb-24 flex flex-col">
+    <div className="bg-surface min-h-screen pb-24 flex flex-col pt-16 sm:pt-20">
       <TopAppBar 
         variant="quiz" 
         progress={progressPercent} 

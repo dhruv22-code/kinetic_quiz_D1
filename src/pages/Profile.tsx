@@ -123,7 +123,7 @@ export default function Profile() {
     full_name: profile?.full_name || '',
     bio: profile?.bio || '',
     department: profile?.department || '',
-    role: profile?.role || 'Educator',
+    role: profile?.role ? (profile.role.toLowerCase() === 'teacher' ? 'educator' : profile.role.toLowerCase()) : 'educator',
     roll: profile?.roll || ''
   });
 
@@ -134,7 +134,7 @@ export default function Profile() {
         full_name: profile.full_name || '',
         bio: profile.bio || '',
         department: profile.department || '',
-        role: profile.role || 'Educator',
+        role: profile.role ? (profile.role.toLowerCase() === 'teacher' ? 'educator' : profile.role.toLowerCase()) : 'educator',
         roll: profile.roll || ''
       });
     }
@@ -288,7 +288,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="bg-surface min-h-screen pb-24 flex flex-col">
+    <div className="bg-surface min-h-screen pb-24 flex flex-col pt-16 sm:pt-20">
       <TopAppBar />
       
       <main className="flex-grow p-6 md:p-12 max-w-5xl mx-auto w-full">
@@ -317,19 +317,19 @@ export default function Profile() {
                 <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">Role</label>
                 <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={() => setEditedProfile({...editedProfile, role: 'Educator'})}
+                    onClick={() => setEditedProfile({...editedProfile, role: 'educator'})}
                     className={cn(
                       "py-4 rounded-2xl border-2 font-bold transition-all",
-                      editedProfile.role === 'Educator' ? "border-primary bg-primary/5 text-primary" : "border-outline-variant/30 text-on-surface-variant"
+                      editedProfile.role === 'educator' ? "border-primary bg-primary/5 text-primary" : "border-outline-variant/30 text-on-surface-variant"
                     )}
                   >
                     Educator
                   </button>
                   <button
-                    onClick={() => setEditedProfile({...editedProfile, role: 'Student'})}
+                    onClick={() => setEditedProfile({...editedProfile, role: 'student'})}
                     className={cn(
                       "py-4 rounded-2xl border-2 font-bold transition-all",
-                      editedProfile.role === 'Student' ? "border-primary bg-primary/5 text-primary" : "border-outline-variant/30 text-on-surface-variant"
+                      editedProfile.role === 'student' ? "border-primary bg-primary/5 text-primary" : "border-outline-variant/30 text-on-surface-variant"
                     )}
                   >
                     Student
@@ -338,7 +338,7 @@ export default function Profile() {
               </div>
 
               <AnimatePresence>
-                {editedProfile.role === 'Student' && (
+                {editedProfile.role === 'student' && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -468,9 +468,9 @@ export default function Profile() {
                   <h1 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight">{teacherInfo.name}</h1>
                   <span className="px-4 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2 self-center md:self-auto">
                     <Shield className="w-3 h-3" />
-                    {teacherInfo.role}
+                    {teacherInfo.role === 'educator' ? 'Educator' : teacherInfo.role === 'teacher' ? 'Educator' : 'Student'}
                   </span>
-                  {profile.role === 'Student' && profile.roll && (
+                  {(profile.role?.toLowerCase() === 'student') && profile.roll && (
                     <span className="px-4 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2 self-center md:self-auto">
                       <CheckCircle2 className="w-3 h-3" />
                       Roll: {profile.roll}

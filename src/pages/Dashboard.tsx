@@ -91,12 +91,16 @@ export default function Dashboard() {
     );
   }
 
-  const isStudent = profile?.role === 'Student';
+  const isStudent = profile?.role?.toLowerCase() === 'student';
+  const isAuthor = quiz?.authorId === profile?.id;
   const isLobby = quiz?.status === 'waiting' || quiz?.status === 'starting';
 
-  if (isStudent) {
+  // If the user is a student OR if they are an educator who does not own the currently active global quiz,
+  // we show them the student join dashboard. This prevents educators from accidentally seeing 
+  // and managing quizzes they didn't create if they joined one via room code.
+  if (isStudent || (quiz && !isAuthor)) {
     return (
-      <div className="bg-surface min-h-screen pb-24 overflow-x-hidden">
+      <div className="bg-surface min-h-screen pb-24 overflow-x-hidden pt-16 sm:pt-20">
         <TopAppBar />
         <main className="max-w-screen-2xl mx-auto px-6 pt-12 flex flex-col items-center">
           <motion.div 
@@ -164,7 +168,7 @@ export default function Dashboard() {
 
   if (!quiz) {
     return (
-      <div className="bg-surface min-h-screen pb-24 overflow-x-hidden">
+      <div className="bg-surface min-h-screen pb-24 overflow-x-hidden pt-16 sm:pt-20">
         <TopAppBar />
         <main className="max-w-screen-2xl mx-auto px-6 pt-20 flex flex-col items-center justify-center text-center">
           <motion.div 
@@ -228,7 +232,7 @@ export default function Dashboard() {
   const avgPercentage = totalScorable > 0 ? (avgRawScore / totalScorable) * 100 : 0;
 
   return (
-    <div className="bg-surface min-h-screen pb-24 overflow-x-hidden">
+    <div className="bg-surface min-h-screen pb-24 overflow-x-hidden pt-16 sm:pt-20">
       <TopAppBar />
       
       <main className="max-w-screen-2xl mx-auto px-6 pt-8">
