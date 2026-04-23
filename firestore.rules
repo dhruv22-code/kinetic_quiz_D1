@@ -119,10 +119,12 @@ service cloud.firestore {
 
     function isValidUser(data) {
       let required = ['id', 'full_name', 'username', 'avatar_url', 'bio', 'department', 'role', 'updated_at'];
+      // Normalize allowed roles to include 'educator' used by some parts of the app
+      let allowedRoles = ['teacher', 'admin', 'student', 'Educator', 'Student', 'educator'];
       return data.keys().hasAll(required) &&
              data.id is string &&
              data.full_name is string && data.full_name.size() <= 100 &&
-             data.role in ['teacher', 'admin', 'student', 'Educator', 'Student'];
+             data.role in allowedRoles;
     }
 
     // User Profiles
@@ -130,7 +132,10 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if (isOwner(userId) || isAdmin()) && (
-        !incoming().diff(existing()).affectedKeys().hasAny(['role']) || isAdmin()
+        isAdmin() || (
+          // Owners can update their profile as long as it's valid and they don't grant themselves admin role
+          isValidUser(incoming()) && incoming().role != 'admin'
+        )
       );
       allow delete: if isAdmin();
     }
