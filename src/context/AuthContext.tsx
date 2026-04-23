@@ -39,6 +39,8 @@ interface AuthContextType {
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  sendOTP: (email: string) => Promise<{ success: boolean; message: string; devMode?: boolean; otp?: string }>;
+  verifyOTP: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -153,8 +155,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing in with Google:', error);
+      
+      // Friendly error handling for common popup issues
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error("The sign-in window was closed before finishing. Please try again.");
+      }
+      if (error.code === 'auth/cancelled-popup-request') {
+        throw new Error("Only one sign-in window can be open at a time. Please check for existing windows.");
+      }
+      if (error.code === 'auth/popup-blocked') {
+        throw new Error("The sign-in window was blocked by your browser. Please allow popups for this site or try opening the app in a new tab.");
+      }
+      if (error.code === 'auth/internal-error' && error.message?.includes('popup')) {
+        throw new Error("An internal error occurred with the sign-in window. Try opening the app in a new web tab.");
+      }
+      
       throw error;
     }
   };
@@ -237,8 +254,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user || !user.email) throw new Error("No user logged in");
     
     try {
-      const credential = EmailAuthProvider.credential(user.email, currentPassword);
-      await reauthenticateWithCredential(user, credential);
+      // Check if user has a password provider
+      const hasPassword = user.providerData.some((p: any) => p.providerId === 'password');
+      
+      if (hasPassword && currentPassword) {
+        const credential = EmailAuthProvider.credential(user.email, currentPassword);
+        await reauthenticateWithCredential(user, credential);
+      }
+      
       await firebaseUpdatePassword(user, newPassword);
     } catch (error) {
       console.error('Error changing password:', error);
@@ -259,8 +282,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Profile is handled by onSnapshot, so this is mostly for compatibility
   };
 
+  const sendOTP = async (email: string) => {
+    try {
+      const response = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to send OTP');
+      return data;
+    } catch (error: any) {
+      console.error('Error in sendOTP:', error);
+      throw error;
+    }
+  };
+
+  const verifyOTP = async (email: string, otp: string) => {
+    try {
+      const response = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to verify OTP');
+      return data;
+    } catch (error: any) {
+      console.error('Error in verifyOTP:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, signInWithGoogle, signInWithEmail, signUpWithEmail, changePassword, sendPasswordReset, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, signInWithGoogle, signInWithEmail, signUpWithEmail, changePassword, sendPasswordReset, refreshProfile, sendOTP, verifyOTP }}>
       {children}
     </AuthContext.Provider>
   );

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, UserPlus, Chrome, ArrowRight, Loader2, User, AtSign, Eye, EyeOff, Briefcase, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, UserPlus, Chrome, ArrowRight, Loader2, User, AtSign, Eye, EyeOff, Briefcase, CheckCircle2, Shield } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
 export default function SignUp() {
@@ -15,18 +15,49 @@ export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signInWithGoogle, signUpWithEmail } = useAuth();
+  const [otp, setOtp] = useState('');
+  const [isSandbox, setIsSandbox] = useState(false);
+  const [step, setStep] = useState<'details' | 'otp'>('details');
+  const { signInWithGoogle, signUpWithEmail, sendOTP, verifyOTP } = useAuth();
   const navigate = useNavigate();
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleInitialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
+      const data = await sendOTP(email);
+      
+      // If we're in dev mode without email config, pre-fill the OTP for testing
+      if (data?.devMode && data?.otp) {
+        setOtp(data.otp);
+        setIsSandbox(true);
+      } else {
+        setIsSandbox(false);
+      }
+      
+      setStep('otp');
+    } catch (err: any) {
+      setError(err.message || "Failed to send verification code.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpVerifyAndSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await verifyOTP(email, otp);
       await signUpWithEmail(email, password, name, username, role, roll);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.message || "Failed to create account.");
+      if (err.code === 'auth/email-already-in-use') {
+        setError("This email is already registered. Please go to the Login page to sign in, or use Forgot Password if you need to set a password.");
+      } else {
+        setError(err.message || "Invalid or expired verification code.");
+      }
     } finally {
       setLoading(false);
     }
@@ -60,136 +91,223 @@ export default function SignUp() {
           <p className="text-on-surface-variant font-body">Create your educator account to start building quizzes.</p>
         </div>
 
-        <form onSubmit={handleSignUp} className="space-y-5">
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Full Name</label>
-            <div className="relative group">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
-              <input 
-                type="text" 
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
-                placeholder="Dr. Sarah Wilson"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Username</label>
-            <div className="relative group">
-              <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
-              <input 
-                type="text" 
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
-                placeholder="sarah_educator"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Email Address</label>
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
-              <input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
-                placeholder="teacher@kinetic.edu"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Account Role</label>
-            <div className="relative group">
-              <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
-              <select 
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full pl-12 pr-10 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body appearance-none cursor-pointer"
-              >
-                <option value="teacher">Teacher / Educator</option>
-                <option value="admin">Administrator</option>
-                <option value="student">Student</option>
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-outline">
-                <ArrowRight className="w-4 h-4 rotate-90" />
-              </div>
-            </div>
-          </div>
-
-          <AnimatePresence>
-            {role === 'student' && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="space-y-2 overflow-hidden"
-              >
-                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Roll Number</label>
+        <AnimatePresence mode="wait">
+          {step === 'details' ? (
+            <motion.form 
+              key="details-form"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              onSubmit={handleInitialSubmit} 
+              className="space-y-5"
+            >
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Full Name</label>
                 <div className="relative group">
-                  <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
                   <input 
                     type="text" 
                     required
-                    value={roll}
-                    onChange={(e) => setRoll(e.target.value)}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
-                    placeholder="2024-STUDENT-001"
+                    placeholder="Dr. Sarah Wilson"
                   />
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Password</label>
-            <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
-              <input 
-                type={showPassword ? "text" : "password"} 
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-12 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
-                placeholder="••••••••"
-              />
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Username</label>
+                <div className="relative group">
+                  <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
+                  <input 
+                    type="text" 
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
+                    placeholder="sarah_educator"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Email Address</label>
+                <div className="relative group">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
+                  <input 
+                    type="email" 
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
+                    placeholder="teacher@kinetic.edu"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Account Role</label>
+                <div className="relative group">
+                  <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
+                  <select 
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full pl-12 pr-10 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body appearance-none cursor-pointer"
+                  >
+                    <option value="teacher">Teacher / Educator</option>
+                    <option value="admin">Administrator</option>
+                    <option value="student">Student</option>
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-outline">
+                    <ArrowRight className="w-4 h-4 rotate-90" />
+                  </div>
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {role === 'student' && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2 overflow-hidden"
+                  >
+                    <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Roll Number</label>
+                    <div className="relative group">
+                      <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
+                      <input 
+                        type="text" 
+                        required
+                        value={roll}
+                        onChange={(e) => setRoll(e.target.value)}
+                        className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
+                        placeholder="2024-STUDENT-001"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Password</label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-12 pr-12 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
+                    placeholder="••••••••"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="p-4 bg-error/10 border border-error/20 rounded-xl text-error text-sm font-medium flex flex-col gap-2"
+                >
+                  <p>{error}</p>
+                  {error.includes("already registered") && (
+                    <Link 
+                      to="/login" 
+                      className="text-xs font-bold underline hover:text-error/80 transition-colors self-start"
+                    >
+                      Go to Login
+                    </Link>
+                  )}
+                </motion.div>
+              )}
+
               <button 
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors"
+                type="submit" 
+                disabled={loading}
+                className="w-full py-4 bg-primary text-white font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Continue</span>}
+                {!loading && <ArrowRight className="w-5 h-5" />}
               </button>
-            </div>
-          </div>
-
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="p-4 bg-error/10 border border-error/20 rounded-xl text-error text-sm font-medium"
+            </motion.form>
+          ) : (
+            <motion.form 
+              key="otp-form"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              onSubmit={handleOtpVerifyAndSignUp} 
+              className="space-y-6"
             >
-              {error}
-            </motion.div>
-          )}
+              <div className="text-center p-4 bg-primary/5 rounded-2xl mb-2">
+                <Shield className="w-10 h-10 text-primary mx-auto mb-3" />
+                <p className="text-sm text-on-surface-variant">We've sent a 6-digit verification code to <span className="font-bold text-on-surface">{email}</span></p>
+                {isSandbox && (
+                  <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                    <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Sandbox Mode</p>
+                    <p className="text-[10px] text-amber-700 mt-0.5 leading-relaxed">Email config is missing in Settings. Code auto-filled for testing.</p>
+                  </div>
+                )}
+              </div>
 
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full py-4 bg-primary text-white font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
-          >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Sign Up</span>}
-            {!loading && <ArrowRight className="w-5 h-5" />}
-          </button>
-        </form>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Verification Code</label>
+                <input 
+                  type="text" 
+                  required
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  className="w-full py-5 bg-surface-container-low border-2 border-outline-variant/30 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-headline text-3xl font-black text-center tracking-[0.5em] placeholder:tracking-normal placeholder:text-sm placeholder:font-bold"
+                  placeholder="000000"
+                />
+              </div>
+
+              {error && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="p-4 bg-error/10 border border-error/20 rounded-xl text-error text-sm font-medium flex flex-col gap-2"
+                >
+                  <p>{error}</p>
+                  {error.includes("already registered") && (
+                    <Link 
+                      to="/login" 
+                      className="text-xs font-bold underline hover:text-error/80 transition-colors self-start"
+                    >
+                      Go to Login
+                    </Link>
+                  )}
+                </motion.div>
+              )}
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full py-4 bg-primary text-white font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+                >
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify & Create Account</span>}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setStep('details')}
+                  className="w-full py-4 text-on-surface-variant font-bold text-sm hover:bg-surface-container rounded-xl transition-colors"
+                >
+                  Back to Details
+                </button>
+              </div>
+            </motion.form>
+          )}
+        </AnimatePresence>
 
         <div className="my-8 flex items-center gap-4">
           <div className="h-px flex-grow bg-outline-variant/20"></div>

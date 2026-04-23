@@ -114,9 +114,9 @@ export default function TopAppBar({ variant = "standard", progress, currentTask,
                   <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none">{profile?.role || 'Educator'}</p>
                 </div>
                 <Link to="/profile" className="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center text-on-primary-container font-bold overflow-hidden shadow-sm border border-outline-variant/20">
-                  {profile?.avatar_url ? (
+                  {(profile?.avatar_url || user?.photoURL) ? (
                     <img
-                      src={profile.avatar_url}
+                      src={profile?.avatar_url || user?.photoURL!}
                       alt="Profile"
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"

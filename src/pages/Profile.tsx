@@ -3,20 +3,31 @@ import BottomNavBar from "@/src/components/BottomNavBar";
 import { User, Mail, Shield, Settings, LogOut, Edit2, Calendar, Award, BookOpen, Globe, ChevronRight, Radio, Lock, Eye, EyeOff, Loader2, CheckCircle2, Camera } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
-import { useAuth } from "../context/AuthContext";
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { useQuiz, Participant, Quiz, Question } from "../context/QuizContext";
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { collection, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { doc, setDoc, serverTimestamp, getDoc, collection, getDocs, updateDoc } from "firebase/firestore";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage, handleFirestoreError, OperationType, isDemoMode } from "../firebase";
 import ThemeToggle from "../components/ThemeToggle";
 
 export default function Profile() {
   const { user, profile, signOut, refreshProfile, changePassword } = useAuth();
   const { quizzes } = useQuiz();
+  const location = useLocation();
   const [allParticipants, setAllParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('setup_password') === 'true') {
+      setIsChangingPassword(true);
+      // Clean up URL
+      window.history.replaceState({}, '', location.pathname);
+    }
+  }, [location]);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -30,7 +41,9 @@ export default function Profile() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -148,49 +161,63 @@ export default function Profile() {
       return;
     }
 
+    // Show local preview immediately
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
     setUploadingAvatar(true);
     setUploadError(null);
+    setUploadProgress(0);
+
     try {
       // 1. Upload to Storage
       const fileName = `${user.uid}_${Date.now()}`;
       const avatarRef = ref(storage, `avatars/${fileName}`);
       
-      console.log('Attempting upload to:', `avatars/${fileName}`);
-      const uploadResult = await uploadBytes(avatarRef, file, { contentType: file.type });
-      console.log('Upload bytes successful:', uploadResult.metadata.fullPath);
+      console.log('Starting upload to:', `avatars/${fileName}`);
+      const uploadTask = uploadBytesResumable(avatarRef, file, { contentType: file.type });
       
-      // 2. Get URL
-      const downloadUrl = await getDownloadURL(avatarRef);
-      console.log('Download URL generated:', downloadUrl);
-      
-      // 3. Update Firestore
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, { 
-        avatar_url: downloadUrl,
-        updated_at: serverTimestamp ? serverTimestamp() : new Date()
-      });
-      
-      await refreshProfile();
-      alert("Profile picture updated successfully!");
+      // Monitor progress
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(Math.round(progress));
+          console.log('Upload progress:', Math.round(progress), '%');
+        }, 
+        (error) => {
+          console.error('Upload task error:', error);
+          setUploadError(`Upload failed: ${error.message}`);
+          setUploadingAvatar(false);
+        }, 
+        async () => {
+          // Upload completed successfully
+          try {
+            const downloadUrl = await getDownloadURL(avatarRef);
+            console.log('File available at:', downloadUrl);
+            
+            // 3. Update Firestore (using setDoc with merge to be safe)
+            const userRef = doc(db, 'users', user.uid);
+            await setDoc(userRef, { 
+              avatar_url: downloadUrl,
+              updated_at: serverTimestamp ? serverTimestamp() : new Date()
+            }, { merge: true });
+            
+            // We DON'T setPreviewUrl(null) here anymore. 
+            // We'll let the onSnapshot listener in AuthContext update the 'profile' state.
+            // We can clear it once the profile.avatar_url actually matches downloadUrl (in a useEffect).
+            alert("Profile picture uploaded! Syncing...");
+          } catch (err: any) {
+            console.error('Post-upload processing error:', err);
+            setUploadError(`Failed to save image reference: ${err.message}`);
+          } finally {
+            setUploadingAvatar(false);
+          }
+        }
+      );
     } catch (err: any) {
-      console.error('Avatar upload detail error:', err);
-      let message = "Failed to upload image.";
-      
-      if (err.code === 'storage/unauthorized') {
-        message = "Permission denied. Please ensure you have enabled Firebase Storage in your console and deployed the rules.";
-      } else if (err.code === 'storage/quota-exceeded') {
-        message = "Storage quota exceeded.";
-      } else if (err.code === 'storage/canceled') {
-        message = "Upload canceled.";
-      } else if (err.message?.includes('network')) {
-        message = "Network error. Please check your connection.";
-      }
-      
-      const detailedError = `${message} (Code: ${err.code || 'unknown'})`;
-      setUploadError(detailedError);
-      console.error(detailedError, err);
-    } finally {
+      console.error('Avatar upload prep error:', err);
+      setUploadError(`Failed to start upload: ${err.message}`);
       setUploadingAvatar(false);
+    } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -235,8 +262,15 @@ export default function Profile() {
     studentsTaught: stats.totalStudents,
     rating: stats.rating,
     bio: profile.bio,
-    avatar: profile.avatar_url || `https://picsum.photos/seed/${user.uid}/200/200`
+    avatar: profile.avatar_url || user.photoURL || `https://picsum.photos/seed/${user.uid}/200/200`
   };
+
+  // Clear preview URL when profile avatar catches up
+  useEffect(() => {
+    if (previewUrl && profile.avatar_url && profile.avatar_url.includes('firebasestorage')) {
+      setPreviewUrl(null);
+    }
+  }, [profile.avatar_url, previewUrl]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -359,17 +393,32 @@ export default function Profile() {
               >
                 <div className="absolute -inset-1 bg-gradient-to-br from-primary to-secondary rounded-full blur opacity-25 group-hover:opacity-50 transition-opacity"></div>
                 <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-surface-container shadow-xl">
-                  {uploadingAvatar ? (
+                  {uploadingAvatar && !previewUrl ? (
                     <div className="absolute inset-0 bg-surface-container-high/80 flex items-center justify-center">
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
                   ) : null}
                   <img 
-                    src={teacherInfo.avatar} 
+                    src={previewUrl || teacherInfo.avatar} 
                     alt={teacherInfo.name} 
-                    className="w-full h-full object-cover"
+                    className={cn(
+                      "w-full h-full object-cover transition-opacity",
+                      uploadingAvatar && previewUrl ? "opacity-50" : "opacity-100"
+                    )}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      // Fallback if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(teacherInfo.name)}&background=3b82f6&color=fff`;
+                    }}
                   />
+                  {uploadingAvatar && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="bg-primary/20 p-2 rounded-full backdrop-blur-sm">
+                        <span className="text-[10px] font-black text-primary">{uploadProgress}%</span>
+                      </div>
+                    </div>
+                  )}
                   <input 
                     type="file" 
                     ref={fileInputRef}
@@ -399,9 +448,9 @@ export default function Profile() {
                   </motion.div>
                 )}
                 {uploadingAvatar && (
-                  <div className="mb-4 flex items-center gap-2 text-primary text-xs font-bold animate-pulse">
+                  <div className="mb-4 flex items-center gap-2 text-primary text-xs font-bold">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    UPLOADING IMAGE...
+                    {uploadProgress < 100 ? `UPLOADING: ${uploadProgress}%` : 'FINALIZING...'}
                   </div>
                 )}
                 <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
@@ -528,27 +577,30 @@ export default function Profile() {
                       </motion.div>
                     ) : (
                       <form onSubmit={handleChangePassword} className="space-y-5">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">Current Password</label>
-                          <div className="relative group">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
-                            <input 
-                              type={showPasswords.current ? "text" : "password"} 
-                              required
-                              value={passwordForm.currentPassword}
-                              onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
-                              className="w-full pl-12 pr-12 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                              placeholder="••••••••"
-                            />
-                            <button 
-                              type="button"
-                              onClick={() => setShowPasswords({...showPasswords, current: !showPasswords.current})}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors"
-                            >
-                              {showPasswords.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                            </button>
+                        {/* Current Password - Only required if user already has a password provider */}
+                        {user?.providerData?.some((p: any) => p.providerId === 'password') && (
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">Current Password</label>
+                            <div className="relative group">
+                              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
+                              <input 
+                                type={showPasswords.current ? "text" : "password"} 
+                                required
+                                value={passwordForm.currentPassword}
+                                onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                                className="w-full pl-12 pr-12 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                placeholder="••••••••"
+                              />
+                              <button 
+                                type="button"
+                                onClick={() => setShowPasswords({...showPasswords, current: !showPasswords.current})}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors"
+                              >
+                                {showPasswords.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         <div className="space-y-2">
                           <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">New Password</label>
