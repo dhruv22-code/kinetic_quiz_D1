@@ -619,7 +619,7 @@ export default function StudentQuiz() {
                        
                        return (
                          <motion.div
-                           key={p.roll}
+                           key={p.roll || `lobby-avatar-${i}`}
                            initial={{ scale: 0, x: 20 }}
                            animate={{ scale: 1, x: 0 }}
                            className={cn(

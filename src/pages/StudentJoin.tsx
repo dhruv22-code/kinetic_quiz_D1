@@ -259,11 +259,11 @@ export default function StudentJoin() {
                           <div className="text-right">
                              <div className="flex -space-x-2 mb-1 justify-end">
                                {participants.slice(0, 3).map((p, i) => (
-                                 <div key={p.roll} className={cn(
+                                 <div key={p.roll || i} className={cn(
                                    "w-6 h-6 rounded-full ring-2 ring-emerald-50 flex items-center justify-center text-[8px] font-bold text-white",
                                    ['bg-blue-400', 'bg-purple-400', 'bg-orange-400'][i % 3]
                                  )}>
-                                   {p.name.charAt(0)}
+                                   {p.name ? p.name.charAt(0) : '?'}
                                  </div>
                                ))}
                                {participants.length > 3 && (

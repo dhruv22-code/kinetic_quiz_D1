@@ -153,7 +153,7 @@ export default function Dashboard() {
               { label: "Avg. Accuracy", value: "0%", icon: Award, color: "text-amber-500" },
               { label: "Points Earned", value: "0", icon: PlusCircle, color: "text-emerald-500" },
             ].map((stat, i) => (
-              <div key={stat.label} className="bg-surface-container-low p-6 rounded-3xl border border-outline-variant/5 flex flex-col items-center text-center">
+              <div key={stat.label || `stat-${i}`} className="bg-surface-container-low p-6 rounded-3xl border border-outline-variant/5 flex flex-col items-center text-center">
                 <stat.icon className={cn("w-8 h-8 mb-3", stat.color)} />
                 <div className="text-2xl font-black font-headline">{stat.value}</div>
                 <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{stat.label}</div>
@@ -318,7 +318,7 @@ export default function Dashboard() {
                   
                   return (
                     <motion.div
-                      key={p.roll}
+                      key={p.roll || `avatar-${i}`}
                       initial={{ scale: 0, x: 20 }}
                       animate={{ scale: 1, x: 0 }}
                       className={cn(
@@ -407,7 +407,7 @@ export default function Dashboard() {
                     
                     return (
                       <motion.div
-                        key={p.roll}
+                        key={p.roll || `starting-avatar-${i}`}
                         initial={{ scale: 0, x: 20 }}
                         animate={{ scale: 1, x: 0 }}
                         className={cn(
@@ -645,7 +645,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="divide-y divide-surface-container">
                   {participants.map((student, index) => (
-                    <tr key={student.roll} className="group hover:bg-surface-container-low/30 transition-colors">
+                    <tr key={student.roll || `student-row-${index}`} className="group hover:bg-surface-container-low/30 transition-colors">
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">{index + 1}</div>
