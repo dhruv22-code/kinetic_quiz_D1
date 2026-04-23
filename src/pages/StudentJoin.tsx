@@ -21,9 +21,19 @@ export default function StudentJoin() {
   const [error, setError] = useState("");
   const [isCodeValid, setIsCodeValid] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
-  const { quiz, findQuizByRoomCode, joinQuiz, participants, isRollAllowed } = useQuiz();
+  const { quiz, findQuizByRoomCode, joinQuiz, participants, isRollAllowed, currentStudentRoll } = useQuiz();
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+
+  // Session Guardian: If already joined an active session, don't allow staying on join page
+  useEffect(() => {
+    if (quiz && currentStudentRoll && quiz.status !== 'finished' && !searchParams.get('error')) {
+      const p = participants.find(part => part.roll === currentStudentRoll);
+      if (p && p.status !== 'Submitted') {
+        navigate("/quiz");
+      }
+    }
+  }, [quiz, currentStudentRoll, participants, navigate]);
   const [history] = useState(() => {
     const saved = JSON.parse(localStorage.getItem('quizHistory') || '[]');
     return [...saved].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());

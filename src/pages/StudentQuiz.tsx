@@ -98,7 +98,7 @@ export default function StudentQuiz() {
     ({ currentLocation, nextLocation }) =>
       !isFinished && 
       !isDisqualified && 
-      quiz?.status === 'active' &&
+      (quiz?.status === 'active' || quiz?.status === 'starting' || quiz?.status === 'waiting') &&
       currentLocation.pathname !== nextLocation.pathname
   );
 
@@ -201,9 +201,17 @@ export default function StudentQuiz() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isFinished, isDisqualified]);
 
+  const isTrappedRef = React.useRef(false);
+
   // Cheat Prevention (Tab switching)
   useEffect(() => {
-    if (!currentStudentRoll || isFinished || quizEnded || isDisqualified || quiz?.status !== 'active') return;
+    if (!currentStudentRoll || isFinished || quizEnded || isDisqualified || (quiz?.status !== 'active' && quiz?.status !== 'starting' && quiz?.status !== 'waiting')) return;
+
+    // History Trap: Push a dummy state so back-button triggers popstate instead of leaving immediately
+    if (!isTrappedRef.current) {
+      window.history.pushState(null, "", window.location.href);
+      isTrappedRef.current = true;
+    }
 
     const handleCheatAttempt = async () => {
       if (isFinished || quizEnded || isDisqualified || showCheatWarning) return;
@@ -233,21 +241,29 @@ export default function StudentQuiz() {
       // Blur is noisy but catches window switching
       // Add a tiny delay to ignore temporary focus flutters
       setTimeout(() => {
-        if (!document.hasFocus()) {
+        if (!document.hasFocus() && !showCheatWarning) {
           handleCheatAttempt();
         }
-      }, 100);
+      }, 200);
+    };
+
+    const handlePopState = (e: PopStateEvent) => {
+      // If we are in any joined state, block back navigation
+      if (!isFinished && !isDisqualified && quiz?.status) {
+        // If they hit back button, immediately push state again to "trap" them and trigger strike
+        window.history.pushState(null, "", window.location.href);
+        handleCheatAttempt();
+      }
     };
 
     window.addEventListener('blur', handleBlur);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    // popstate catch for browser back/forward buttons
-    window.addEventListener('popstate', handleCheatAttempt);
+    window.addEventListener('popstate', handlePopState);
 
     return () => {
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('popstate', handleCheatAttempt);
+      window.removeEventListener('popstate', handlePopState);
     };
   }, [currentStudentRoll, isFinished, quizEnded, isDisqualified, quiz?.status, showCheatWarning]);
 
