@@ -288,7 +288,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="bg-surface min-h-screen pb-24 flex flex-col pt-16 sm:pt-20">
+    <div className="bg-surface min-h-screen pb-24 flex flex-col pt-24 md:pt-28">
       <TopAppBar />
       
       <main className="flex-grow p-6 md:p-12 max-w-5xl mx-auto w-full">

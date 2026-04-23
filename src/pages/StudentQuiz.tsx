@@ -736,7 +736,7 @@ export default function StudentQuiz() {
   const isExpired = questionTimeLeft === 0;
 
   return (
-    <div className="bg-surface min-h-screen pb-24 flex flex-col pt-16 sm:pt-20">
+    <div className="bg-surface min-h-screen pb-24 flex flex-col pt-24 md:pt-28">
       <TopAppBar 
         variant="quiz" 
         progress={progressPercent} 

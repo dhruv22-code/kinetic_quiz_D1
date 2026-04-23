@@ -546,7 +546,7 @@ export default function QuizEditor() {
   };
 
   return (
-    <div className="bg-surface min-h-screen pb-24 overflow-x-hidden">
+    <div className="bg-surface min-h-screen pb-24 overflow-x-hidden pt-24 md:pt-28">
       <TopAppBar />
       
       <main className="max-w-5xl mx-auto px-6 pt-8">

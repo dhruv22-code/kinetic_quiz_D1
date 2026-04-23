@@ -181,10 +181,10 @@ export default function StudentJoin() {
   };
 
   return (
-    <div className="bg-surface min-h-screen pb-24 flex flex-col">
+    <div className="bg-surface min-h-screen pb-24 flex flex-col pt-24 md:pt-28">
       <TopAppBar />
       
-      <main className="flex-grow flex items-center justify-center px-6 py-12 relative overflow-hidden">
+      <main className="flex-grow flex flex-col items-center px-6 py-12 md:py-20 relative">
         <div className="absolute top-6 right-6 z-20">
           <ThemeToggle />
         </div>
