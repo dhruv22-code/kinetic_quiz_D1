@@ -644,13 +644,12 @@ export function QuizProvider({ children }: { children: ReactNode }) {
     const activeQuiz = targetQuiz || quiz;
     if (!activeQuiz?.id || !activeQuiz.isActive) return;
 
-    // Reject joins if quiz is already active or finished
-    if (activeQuiz.status === 'active' || activeQuiz.status === 'finished') {
-      throw new Error("This quiz has already started or finished. New students cannot join.");
+    // Always reject joins if quiz is finished
+    if (activeQuiz.status === 'finished') {
+      throw new Error("This quiz has finished. You can no longer join.");
     }
 
     if (isDemoMode) {
-      // Check existing in local
       const responses = mockStore.getAllResponses();
       const existing = responses.find((r: any) => r.quizId === activeQuiz.id && r.roll === p.roll);
       
@@ -674,6 +673,11 @@ export function QuizProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('currentStudentRoll', p.roll);
         setQuiz(activeQuiz);
         return;
+      }
+
+      // If quiz is already starting/active, and participant doesn't exist, block entry
+      if (activeQuiz.status === 'active' || activeQuiz.status === 'starting') {
+        throw new Error("This quiz has already started. New students cannot join.");
       }
       
       const questions = activeQuiz.questions || [];
@@ -721,6 +725,9 @@ export function QuizProvider({ children }: { children: ReactNode }) {
 
       await runTransaction(db, async (transaction) => {
         const docSnap = await transaction.get(docRef);
+        const quizRef = doc(db, 'quizzes', activeQuiz.id);
+        const quizSnap = await transaction.get(quizRef);
+        const latestQuiz = quizSnap.data() as Quiz;
         const now = Date.now();
 
         if (docSnap.exists()) {
@@ -746,8 +753,13 @@ export function QuizProvider({ children }: { children: ReactNode }) {
             status: 'Appearing'
           });
         } else {
+          // New participant joining
+          // Block if quiz has already started
+          if (latestQuiz.status === 'active' || latestQuiz.status === 'starting') {
+            throw new Error("This quiz has already started. New students cannot join.");
+          }
+
           // First time joining: Create record atomically
-          // Shuffle questions and options (minimal subset for transaction speed)
           const questions = activeQuiz.questions || [];
           let questionOrder = shuffleArray(questions.map(q => q.id));
           const drawCount = activeQuiz.drawCount || questions.length;

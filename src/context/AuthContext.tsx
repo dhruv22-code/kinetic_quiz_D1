@@ -6,7 +6,7 @@ import {
   GoogleAuthProvider, 
   signInWithPopup, 
   createUserWithEmailAndPassword, 
-  updateProfile, 
+  updateProfile as firebaseUpdateProfile, 
   signInWithEmailAndPassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -39,6 +39,7 @@ interface AuthContextType {
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateProfile: (data: Partial<Profile>) => Promise<void>;
   sendOTP: (email: string) => Promise<{ success: boolean; message: string; devMode?: boolean; otp?: string }>;
   verifyOTP: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
 }
@@ -228,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const user = userCredential.user;
       
       // Update auth profile
-      await updateProfile(user, { displayName: name });
+      await firebaseUpdateProfile(user, { displayName: name });
 
       // Create firestore profile
       const profileRef = doc(db, 'users', user.uid);
@@ -282,6 +283,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Profile is handled by onSnapshot, so this is mostly for compatibility
   };
 
+  const updateProfile = async (data: Partial<Profile>) => {
+    if (isDemoMode) {
+      const newProfile = { ...profile, ...data } as Profile;
+      setProfile(newProfile);
+      localStorage.setItem('demo_profile', JSON.stringify(newProfile));
+      return;
+    }
+
+    if (!user) throw new Error("No user logged in");
+    const profileRef = doc(db, 'users', user.uid);
+    await setDoc(profileRef, { ...data, updated_at: serverTimestamp() }, { merge: true });
+  };
+
   const sendOTP = async (email: string) => {
     try {
       const response = await fetch('/api/otp/send', {
@@ -315,7 +329,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, signInWithGoogle, signInWithEmail, signUpWithEmail, changePassword, sendPasswordReset, refreshProfile, sendOTP, verifyOTP }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, signInWithGoogle, signInWithEmail, signUpWithEmail, changePassword, sendPasswordReset, refreshProfile, updateProfile, sendOTP, verifyOTP }}>
       {children}
     </AuthContext.Provider>
   );

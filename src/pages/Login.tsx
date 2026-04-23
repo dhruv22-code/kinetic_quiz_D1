@@ -93,35 +93,23 @@ export default function Login() {
     setResetLoading(true);
     setResetError(null);
     try {
-      await sendOTP(resetEmail);
-      setResetStep('verify');
+      await sendPasswordReset(resetEmail);
+      setResetSuccess(true);
     } catch (err: any) {
-      setResetError(err.message || "Failed to send reset code. Please check the address.");
+      setResetError(err.message || "Failed to send reset email. Please check the address.");
     } finally {
       setResetLoading(false);
     }
   };
 
   const handleResetOtpVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setResetLoading(true);
-    setResetError(null);
-    try {
-      await verifyOTP(resetEmail, resetOtp);
-      setResetStep('new-password');
-    } catch (err: any) {
-      setResetError(err.message || "Invalid or expired code.");
-    } finally {
-      setResetLoading(false);
-    }
+    // Legacy - no longer used with standard Firebase reset
+    setIsForgotPassword(false);
   };
 
   const handleSetNewPassword = () => {
-    // Redirect to profile with a special flag to trigger password setup
-    // We log them in via Google first to ensure authentication
-    handleGoogleLogin().then(() => {
-      navigate('/profile?setup_password=true');
-    });
+    // Legacy - no longer used with standard Firebase reset
+    setIsForgotPassword(false);
   };
 
   return (
@@ -212,7 +200,7 @@ export default function Login() {
               <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full py-4 bg-primary text-white font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
+                className="w-full py-4 bg-primary text-on-primary font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Continue</span>}
                 {!loading && <ArrowRight className="w-5 h-5" />}
@@ -275,7 +263,7 @@ export default function Login() {
                 <button 
                   type="submit" 
                   disabled={loading}
-                  className="w-full py-4 bg-primary text-white font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+                  className="w-full py-4 bg-primary text-on-primary font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
                 >
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify & Sign In</span>}
                 </button>
@@ -326,9 +314,7 @@ export default function Login() {
                   <div>
                     <h3 className="font-headline text-2xl font-extrabold text-on-surface">Reset Password</h3>
                     <p className="text-sm text-on-surface-variant">
-                      {resetStep === 'request' ? "We'll send you a security code" : 
-                       resetStep === 'verify' ? "Enter the code from your email" : 
-                       "Create your new password"}
+                      We'll send a secure link to your email
                     </p>
                   </div>
                 </div>
@@ -342,27 +328,22 @@ export default function Login() {
                     <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <CheckCircle2 className="w-10 h-10 text-emerald-500" />
                     </div>
-                    <h4 className="font-headline text-xl font-bold text-on-surface mb-2">Identity Verified!</h4>
+                    <h4 className="font-headline text-xl font-bold text-on-surface mb-2">Email Sent!</h4>
                     <p className="text-on-surface-variant mb-6 text-sm leading-relaxed text-left bg-surface-container-low p-4 rounded-xl border border-outline-variant/10">
-                      We've verified your identity. To set your manual login password, we need a 1-second bridge through Google.
+                      We've sent a password reset link to <span className="font-bold text-on-surface">{resetEmail}</span>. Please check your inbox and follow the instructions to set a new password.
                     </p>
                     <button 
-                      onClick={handleSetNewPassword}
+                      onClick={() => {
+                        setIsForgotPassword(false);
+                        setResetSuccess(false);
+                      }}
                       className="w-full py-4 bg-primary text-white font-bold rounded-xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
-                      <Chrome className="w-5 h-5" />
-                      Set Password & Sync
-                    </button>
-                    <button 
-                      onClick={() => setResetStep('request')}
-                      className="w-full mt-2 py-3 text-xs font-bold text-on-surface-variant hover:underline"
-                    >
-                      Cancel
+                      Back to Login
                     </button>
                   </motion.div>
                 ) : (
                   <div className="space-y-6">
-                    {resetStep === 'request' && (
                       <form onSubmit={handleForgotPasswordRequest} className="space-y-5">
                         <div className="space-y-2">
                           <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">Email Address</label>
@@ -399,95 +380,10 @@ export default function Login() {
                             disabled={resetLoading}
                             className="flex-1 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                           >
-                            {resetLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Send Code"}
+                            {resetLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Send Link"}
                           </button>
                         </div>
                       </form>
-                    )}
-
-                    {resetStep === 'verify' && (
-                      <form onSubmit={handleResetOtpVerify} className="space-y-5">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">Security Code</label>
-                          <input 
-                            type="text" 
-                            required
-                            maxLength={6}
-                            value={resetOtp}
-                            onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ''))}
-                            className="w-full py-5 bg-surface-container-low border-2 border-outline-variant/30 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-headline text-3xl font-black text-center tracking-[0.5em] placeholder:tracking-normal placeholder:text-sm"
-                            placeholder="000000"
-                          />
-                        </div>
-
-                        {resetError && (
-                          <p className="text-error text-sm font-medium px-1">{resetError}</p>
-                        )}
-
-                        <div className="flex gap-4 pt-4">
-                          <button 
-                            type="button"
-                            onClick={() => setResetStep('request')}
-                            className="flex-1 py-4 bg-surface-container-low text-on-surface font-bold rounded-xl hover:bg-surface-container transition-all"
-                          >
-                            Back
-                          </button>
-                          <button 
-                            type="submit"
-                            disabled={resetLoading}
-                            className="flex-1 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                          >
-                            {resetLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify"}
-                          </button>
-                        </div>
-                      </form>
-                    )}
-
-                    {resetStep === 'new-password' && (
-                      <form onSubmit={handleSetNewPassword} className="space-y-5">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">New Password</label>
-                          <div className="relative group">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
-                            <input 
-                              type="password" 
-                              required
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                              className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                              placeholder="Min 6 characters"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">Confirm New Password</label>
-                          <div className="relative group">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
-                            <input 
-                              type="password" 
-                              required
-                              value={confirmNewPassword}
-                              onChange={(e) => setConfirmNewPassword(e.target.value)}
-                              className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                              placeholder="Confirm new password"
-                            />
-                          </div>
-                        </div>
-
-                        {resetError && (
-                          <p className="text-error text-sm font-medium px-1">{resetError}</p>
-                        )}
-
-                        <button 
-                          type="submit"
-                          disabled={resetLoading}
-                          className="w-full py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                          {resetLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Update Password"}
-                        </button>
-                      </form>
-                    )}
                   </div>
                 )}
               </motion.div>

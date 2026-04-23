@@ -22,14 +22,14 @@ export default function BottomNavBar() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-2 bg-white/80 backdrop-blur-xl shadow-[0_-10px_30px_rgba(42,43,81,0.04)] z-50 rounded-t-2xl md:hidden">
+    <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-2 bg-surface-container-low/80 backdrop-blur-xl border-t border-outline-variant/10 shadow-lg z-50 rounded-t-2xl md:hidden transition-colors">
       {navItems.map((item) => (
         <Link
           key={item.label}
           to={item.path}
           className={cn(
             "flex flex-col items-center justify-center px-3 py-1 transition-all",
-            location.pathname === item.path ? "bg-primary/10 text-primary rounded-xl scale-105" : "text-on-surface-variant hover:bg-slate-100"
+            location.pathname === item.path ? "bg-primary/10 text-primary rounded-xl scale-105" : "text-on-surface-variant hover:bg-surface-container-high/50"
           )}
         >
           <item.icon className={cn("w-6 h-6", location.pathname === item.path && "fill-current")} />

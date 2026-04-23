@@ -81,24 +81,24 @@ export default function AIChatAssistant() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className={cn(
-              "pointer-events-auto bg-white rounded-[1.5rem] shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-gray-100 flex flex-col overflow-hidden transition-all duration-300",
+              "pointer-events-auto bg-surface-container-lowest rounded-[1.5rem] shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-outline-variant/10 flex flex-col overflow-hidden transition-all duration-300",
               isFullScreen 
                 ? "w-full h-full max-h-none" 
                 : "w-[320px] h-[450px] max-h-[calc(100vh-100px)] mb-0"
             )}
           >
             {/* Header */}
-            <div className="px-4 py-3 bg-white border-b border-gray-100 flex items-center justify-between">
+            <div className="px-4 py-3 bg-surface-container-lowest border-b border-outline-variant/10 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-[#6210CC] rounded-lg flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-white" />
+                <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-on-primary" />
                 </div>
-                <h3 className="font-sans font-bold text-gray-900 text-base tracking-tight">Quiz Assistant</h3>
+                <h3 className="font-headline font-bold text-on-surface text-base tracking-tight">Quiz Assistant</h3>
               </div>
               <div className="flex items-center gap-0.5">
                 <button 
                   onClick={() => setMessages([{ role: "model", text: "Hello! I'm your AI Quiz Assistant. Ask me for question ideas on any topic!", timestamp: new Date() }])}
-                  className="p-1.5 hover:bg-gray-50 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+                  className="p-1.5 hover:bg-surface-container-low rounded-full transition-colors text-on-surface-variant hover:text-on-surface"
                   title="Reset chat"
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -106,8 +106,8 @@ export default function AIChatAssistant() {
                 <button 
                   onClick={() => setIsFullScreen(!isFullScreen)}
                   className={cn(
-                    "p-1.5 hover:bg-gray-50 rounded-full transition-colors text-gray-400 hover:text-gray-600",
-                    isFullScreen && "text-[#6210CC]"
+                    "p-1.5 hover:bg-surface-container-low rounded-full transition-colors text-on-surface-variant hover:text-on-surface",
+                    isFullScreen && "text-primary"
                   )}
                   title={isFullScreen ? "Exit full screen" : "Full screen"}
                 >
@@ -118,7 +118,7 @@ export default function AIChatAssistant() {
                     setIsOpen(false);
                     setIsFullScreen(false);
                   }}
-                  className="p-1.5 hover:bg-gray-50 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+                  className="p-1.5 hover:bg-surface-container-low rounded-full transition-colors text-on-surface-variant hover:text-on-surface"
                   aria-label="Close chat"
                 >
                   <X className="w-4 h-4" />
@@ -128,11 +128,11 @@ export default function AIChatAssistant() {
 
             {/* Date Separator */}
             <div className="flex items-center gap-3 px-4 py-3">
-              <div className="flex-grow h-[1px] bg-gray-100"></div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              <div className="flex-grow h-[1px] bg-outline-variant/20"></div>
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
-              <div className="flex-grow h-[1px] bg-gray-100"></div>
+              <div className="flex-grow h-[1px] bg-outline-variant/20"></div>
             </div>
 
             {/* Messages */}
@@ -146,8 +146,8 @@ export default function AIChatAssistant() {
                   )}
                 >
                   {msg.role === "model" && (
-                    <div className="w-7 h-7 bg-[#6210CC] rounded-lg flex-shrink-0 flex items-center justify-center mt-1">
-                      <Bot className="w-4 h-4 text-white" />
+                    <div className="w-7 h-7 bg-primary rounded-lg flex-shrink-0 flex items-center justify-center mt-1">
+                      <Bot className="w-4 h-4 text-on-primary" />
                     </div>
                   )}
                   <div className={cn(
@@ -155,7 +155,7 @@ export default function AIChatAssistant() {
                     msg.role === "user" ? "items-end" : "items-start"
                   )}>
                     {msg.role === "model" && (
-                      <span className="text-[10px] font-bold text-gray-400 mb-1 ml-1">Quiz Assistant</span>
+                      <span className="text-[10px] font-bold text-on-surface-variant mb-1 ml-1">Quiz Assistant</span>
                     )}
                     <div className={cn(
                       "flex items-end gap-1.5",
@@ -164,12 +164,12 @@ export default function AIChatAssistant() {
                       <div className={cn(
                         "p-3 text-[13px] leading-[1.4] shadow-sm transition-all",
                         msg.role === "user" 
-                          ? "bg-white text-[#6210CC] border-2 border-[#6210CC] rounded-[1rem] rounded-tr-none hover:bg-[#6210CC] hover:text-white" 
-                          : "bg-[#F3F3F3] text-gray-800 rounded-[1rem] rounded-tl-none"
+                          ? "bg-primary text-on-primary rounded-[1rem] rounded-tr-none hover:opacity-90" 
+                          : "bg-surface-container-low text-on-surface rounded-[1rem] rounded-tl-none"
                       )}>
                         {msg.text}
                       </div>
-                      <span className="text-[9px] text-gray-400 font-medium mb-0.5 whitespace-nowrap">
+                      <span className="text-[9px] text-on-surface-variant font-medium mb-0.5 whitespace-nowrap">
                         {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
@@ -178,14 +178,14 @@ export default function AIChatAssistant() {
               ))}
               {isLoading && (
                 <div className="flex gap-2">
-                  <div className="w-7 h-7 bg-[#6210CC] rounded-lg flex-shrink-0 flex items-center justify-center mt-1">
-                    <Bot className="w-4 h-4 text-white" />
+                  <div className="w-7 h-7 bg-primary rounded-lg flex-shrink-0 flex items-center justify-center mt-1">
+                    <Bot className="w-4 h-4 text-on-primary" />
                   </div>
-                  <div className="bg-[#F3F3F3] p-3 rounded-[1rem] rounded-tl-none shadow-sm">
+                  <div className="bg-surface-container-low p-3 rounded-[1rem] rounded-tl-none shadow-sm">
                     <div className="flex gap-1">
-                      <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                      <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                      <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></span>
+                      <span className="w-1 h-1 bg-on-surface-variant rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                      <span className="w-1 h-1 bg-on-surface-variant rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                      <span className="w-1 h-1 bg-on-surface-variant rounded-full animate-bounce"></span>
                     </div>
                   </div>
                 </div>
@@ -194,7 +194,7 @@ export default function AIChatAssistant() {
             </div>
 
             {/* Footer / Input */}
-            <div className="p-4 bg-white border-t border-gray-100">
+            <div className="p-4 bg-surface-container-lowest border-t border-outline-variant/10">
               <div className="relative flex items-center gap-2">
                 <input 
                   type="text" 
@@ -202,12 +202,12 @@ export default function AIChatAssistant() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   placeholder="Ask for ideas..."
-                  className="flex-grow px-4 py-2.5 bg-white border border-gray-200 rounded-full text-[13px] focus:ring-2 focus:ring-[#6210CC]/10 focus:border-[#6210CC] outline-none transition-all placeholder:text-gray-400"
+                  className="flex-grow px-4 py-2.5 bg-surface-container-low border border-outline-variant/30 rounded-full text-[13px] focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-on-surface-variant text-on-surface"
                 />
                 <button 
                   onClick={handleSend}
                   disabled={!input.trim() || isLoading}
-                  className="p-2.5 bg-[#6210CC] text-white rounded-full disabled:opacity-50 transition-all hover:bg-[#520db0] active:scale-95 shadow-lg shadow-[#6210CC]/20"
+                  className="p-2.5 bg-primary text-on-primary rounded-full disabled:opacity-50 transition-all hover:opacity-90 active:scale-95 shadow-lg shadow-primary/20"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -225,7 +225,7 @@ export default function AIChatAssistant() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsOpen(true)}
-          className="pointer-events-auto w-14 h-14 rounded-full shadow-[0_8px_24px_rgba(98,16,204,0.3)] flex items-center justify-center bg-[#6210CC] text-white"
+          className="pointer-events-auto w-14 h-14 rounded-full shadow-lg flex items-center justify-center bg-primary text-on-primary hover:scale-110 transition-transform"
         >
           <MessageSquare className="w-6 h-6" />
         </motion.button>

@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
-import { User, BookOpen, Globe, Info, ArrowRight, Loader2, Camera, GraduationCap, Briefcase } from 'lucide-react';
+import { User, BookOpen, Globe, Info, ArrowRight, Loader2, Camera, GraduationCap, Briefcase, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 
 export default function Onboarding() {
-  const { user, profile, refreshProfile, loading: authLoading } = useAuth();
+  const { user, profile, refreshProfile, updateProfile, loading: authLoading } = useAuth();
   const [fullName, setFullName] = useState('');
   const [bio, setBio] = useState('');
   const [department, setDepartment] = useState('');
+  const [roll, setRoll] = useState('');
   const [role, setRole] = useState<'Educator' | 'Student'>('Educator');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,18 +34,15 @@ export default function Onboarding() {
     setError(null);
 
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, {
-        id: user.uid,
+      await updateProfile({
         full_name: fullName,
         username: user.email?.split('@')[0] || user.uid,
         bio,
         department,
         role: role.toLowerCase(),
+        roll: role === 'Student' ? roll : '',
         avatar_url: `https://picsum.photos/seed/${user.uid}/200/200`,
-        updated_at: new Date().toISOString()
       });
-      await refreshProfile();
       navigate('/dashboard');
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
@@ -152,6 +150,27 @@ export default function Onboarding() {
                   />
                 </div>
               </div>
+
+              {role === 'Student' && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-2 overflow-hidden"
+                >
+                  <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label ml-1">Roll Number</label>
+                  <div className="relative group">
+                    <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-outline group-focus-within:text-primary transition-colors" />
+                    <input 
+                      type="text" 
+                      required
+                      value={roll}
+                      onChange={(e) => setRoll(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
+                      placeholder="2024-STUDENT-001"
+                    />
+                  </div>
+                </motion.div>
+              )}
             </div>
           </div>
 
@@ -185,7 +204,7 @@ export default function Onboarding() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full py-5 bg-primary text-white font-headline font-bold text-lg rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+            className="w-full py-5 bg-primary text-on-primary font-headline font-bold text-lg rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
           >
             {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <span>Start Your Journey</span>}
             {!loading && <ArrowRight className="w-6 h-6" />}

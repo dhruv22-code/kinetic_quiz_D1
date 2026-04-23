@@ -75,6 +75,18 @@ export default function StudentQuiz() {
     timeLeftRef.current = questionTimeLeft;
   }, [questionTimeLeft]);
 
+  // Sync cheat attempts and disqualification status from database
+  useEffect(() => {
+    if (participant) {
+      if (participant.cheatingAttempts !== undefined && participant.cheatingAttempts > cheatAttempts) {
+        setCheatAttempts(participant.cheatingAttempts);
+      }
+      if (participant.isDisqualified && !isDisqualified) {
+        setIsDisqualified(true);
+      }
+    }
+  }, [participant?.cheatingAttempts, participant?.isDisqualified]);
+
   // Tab Exclusivity Check (BroadcastChannel prevents multiple tabs of the same user)
   useEffect(() => {
     if (!currentStudentRoll || isFinished || quizEnded) return;
@@ -156,7 +168,7 @@ export default function StudentQuiz() {
   useEffect(() => {
     if (!currentStudentRoll || isFinished || quizEnded || isDisqualified || quiz?.status !== 'active') return;
 
-    const handleCheatAttempt = () => {
+    const handleCheatAttempt = async () => {
       if (isFinished || quizEnded || isDisqualified || showCheatWarning) return;
       
       const newAttempts = cheatAttemptsRef.current + 1;
@@ -164,6 +176,10 @@ export default function StudentQuiz() {
 
       if (newAttempts === 1) {
         setShowCheatWarning(true);
+        // Persist the first warning to database for re-entry situations
+        if (currentStudentRoll) {
+          await updateParticipant(currentStudentRoll, { cheatingAttempts: 1 });
+        }
       } else if (newAttempts >= 2) {
         handleDisqualification();
       }
@@ -662,26 +678,12 @@ export default function StudentQuiz() {
       <TopAppBar 
         variant="quiz" 
         progress={progressPercent} 
-        currentTask={`Question ${currentQuestionIndex} of ${totalQuestions > 0 ? totalQuestions - 1 : 0}`} 
+        currentTask={`Question ${currentQuestionIndex + 1} of ${totalQuestions}`} 
         timeLeft={questionTimeLeft !== null ? `${questionTimeLeft}s` : "..."} 
+        timerProgress={questionTimeLeft !== null && currentQuestion ? (questionTimeLeft / currentQuestion.timer) * 100 : undefined}
         isLowTime={isTimeLow}
         onLogoClick={() => setShowLeaveWarning(true)}
       />
-
-      {/* Question Timer Progress Bar */}
-      {questionTimeLeft !== null && currentQuestion && (
-        <div className="w-full h-1.5 bg-surface-container-low overflow-hidden">
-          <motion.div 
-            initial={{ width: "100%" }}
-            animate={{ width: `${(questionTimeLeft / currentQuestion.timer) * 100}%` }}
-            transition={{ duration: 1, ease: "linear" }}
-            className={cn(
-              "h-full transition-colors duration-500",
-              isQuestionTimeLow ? "bg-error" : "bg-primary"
-            )}
-          />
-        </div>
-      )}
 
       {/* Cheating Warning Modal */}
       <AnimatePresence>

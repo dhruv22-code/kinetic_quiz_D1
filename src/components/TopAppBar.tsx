@@ -9,11 +9,12 @@ interface TopAppBarProps {
   progress?: number;
   currentTask?: string;
   timeLeft?: string;
+  timerProgress?: number;
   isLowTime?: boolean;
   onLogoClick?: () => void;
 }
 
-export default function TopAppBar({ variant = "standard", progress, currentTask, timeLeft, isLowTime, onLogoClick }: TopAppBarProps) {
+export default function TopAppBar({ variant = "standard", progress, currentTask, timeLeft, timerProgress, isLowTime, onLogoClick }: TopAppBarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
@@ -29,7 +30,7 @@ export default function TopAppBar({ variant = "standard", progress, currentTask,
         <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
           <Zap className="w-6 h-6" />
         </div>
-        <span className="font-headline font-black text-2xl tracking-tighter text-on-surface">KINETIC</span>
+        <span className="font-headline font-black text-xl sm:text-2xl tracking-tighter text-on-surface hidden xs:inline-block">KINETIC</span>
       </div>
     );
 
@@ -143,34 +144,46 @@ export default function TopAppBar({ variant = "standard", progress, currentTask,
         )}
 
         {variant === "quiz" && (
-          <div className="hidden md:flex items-center gap-8">
-            <div className="flex flex-col items-center">
-              <span className="text-on-surface-variant font-label text-[10px] uppercase tracking-widest">Progress</span>
-              <span className="font-headline font-bold text-lg text-primary">{currentTask}</span>
+          <div className="flex items-center gap-4 sm:gap-8 ml-auto">
+            <div className="hidden xs:flex flex-col items-center">
+              <span className="text-on-surface-variant font-label text-[8px] sm:text-[10px] uppercase tracking-widest leading-none mb-1">Progress</span>
+              <span className="font-headline font-bold text-sm sm:text-lg text-primary whitespace-nowrap">{currentTask}</span>
             </div>
             
             <div className={cn(
-              "relative flex items-center justify-center h-14 w-32 backdrop-blur-md rounded-xl px-4 overflow-hidden border-b-2 transition-colors duration-300",
+              "relative flex items-center justify-center h-12 sm:h-14 w-24 sm:w-32 backdrop-blur-md rounded-lg sm:rounded-xl px-2 sm:px-4 overflow-hidden border-b-2 transition-colors duration-300 shadow-sm",
               isLowTime ? "bg-error-container/50 border-error" : "bg-surface-container-highest/70 border-tertiary"
             )}>
               <div className="flex flex-col items-center z-10">
                 <span className={cn(
-                  "text-[10px] font-label font-bold uppercase tracking-tighter",
+                  "text-[8px] sm:text-[10px] font-label font-bold uppercase tracking-tighter leading-none mb-0.5",
                   isLowTime ? "text-error" : "text-tertiary"
                 )}>Time Left</span>
                 <span className={cn(
-                  "font-headline font-extrabold text-2xl",
+                  "font-headline font-extrabold text-xl sm:text-2xl leading-none",
                   isLowTime ? "text-error animate-pulse" : "text-on-surface"
                 )}>{timeLeft}</span>
               </div>
               <div className={cn(
-                "absolute inset-0 bg-gradient-to-t to-transparent",
-                isLowTime ? "from-error-container/20" : "from-tertiary-container/20"
+                "absolute inset-0 bg-gradient-to-t to-transparent opacity-30",
+                isLowTime ? "from-error-container" : "from-tertiary-container"
               )}></div>
             </div>
           </div>
         )}
       </div>
+      
+      {variant === "quiz" && timerProgress !== undefined && (
+        <div className="w-full h-1 bg-surface-container-low overflow-hidden">
+          <div 
+            className={cn(
+              "h-full transition-all duration-1000 ease-linear",
+              isLowTime ? "bg-error" : "bg-primary"
+            )}
+            style={{ width: `${timerProgress}%` }}
+          />
+        </div>
+      )}
     </div>
   </header>
 );

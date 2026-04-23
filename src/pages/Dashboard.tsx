@@ -96,7 +96,7 @@ export default function Dashboard() {
 
   if (isStudent) {
     return (
-      <div className="bg-surface min-h-screen pb-24">
+      <div className="bg-surface min-h-screen pb-24 overflow-x-hidden">
         <TopAppBar />
         <main className="max-w-screen-2xl mx-auto px-6 pt-12 flex flex-col items-center">
           <motion.div 
@@ -135,7 +135,7 @@ export default function Dashboard() {
               <button 
                 onClick={() => navigate(`/join?code=${roomCode}`)}
                 disabled={!roomCode}
-                className="w-full py-6 bg-primary text-white font-headline font-bold text-xl rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:hover:scale-100"
+                className="w-full py-6 bg-primary text-on-primary font-headline font-bold text-xl rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:hover:scale-100"
               >
                 Join Quiz Session
                 <ArrowRight className="w-6 h-6" />
@@ -164,7 +164,7 @@ export default function Dashboard() {
 
   if (!quiz) {
     return (
-      <div className="bg-surface min-h-screen pb-24">
+      <div className="bg-surface min-h-screen pb-24 overflow-x-hidden">
         <TopAppBar />
         <main className="max-w-screen-2xl mx-auto px-6 pt-20 flex flex-col items-center justify-center text-center">
           <motion.div 
@@ -179,7 +179,7 @@ export default function Dashboard() {
             <p className="text-on-surface-variant mb-8">You haven't created any live sessions yet. Start by building a new quiz for your students.</p>
             <Link 
               to="/quiz-editor"
-              className="inline-flex items-center justify-center px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+              className="inline-flex items-center justify-center px-8 py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
             >
               Create New Quiz
             </Link>
@@ -228,7 +228,7 @@ export default function Dashboard() {
   const avgPercentage = totalScorable > 0 ? (avgRawScore / totalScorable) * 100 : 0;
 
   return (
-    <div className="bg-surface min-h-screen pb-24">
+    <div className="bg-surface min-h-screen pb-24 overflow-x-hidden">
       <TopAppBar />
       
       <main className="max-w-screen-2xl mx-auto px-6 pt-8">
@@ -249,59 +249,61 @@ export default function Dashboard() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-surface-container-lowest rounded-3xl p-6 mb-8 flex items-center justify-between shadow-sm border border-surface-container"
+          className="bg-surface-container-lowest rounded-3xl p-5 sm:p-8 mb-8 flex flex-col lg:flex-row lg:items-center justify-between shadow-sm border border-surface-container gap-6 sm:gap-8"
         >
-          <div>
+          <div className="w-full lg:w-auto">
             <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Room Code</span>
-            <div className="text-3xl font-black font-headline text-primary">{quiz.roomCode}</div>
-            <div className="mt-2 flex items-center gap-2 text-[10px] text-on-surface-variant">
-              <span className="font-bold">Share Link:</span>
-              <span className="bg-surface-container-low px-2 py-1 rounded truncate max-w-[200px]">
-                {window.location.origin}/join?code={quiz.roomCode.replace('-', '')}
-              </span>
-              <button 
-                onClick={() => {
-                  let publicOrigin = window.location.origin;
-                  if (publicOrigin.includes('ais-dev')) {
-                    publicOrigin = publicOrigin.replace('ais-dev', 'ais-pre');
-                  }
-                  navigator.clipboard.writeText(`${publicOrigin}/join?code=${quiz.roomCode.replace('-', '')}`);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-                className="p-1 hover:bg-surface-container-high rounded transition-colors relative"
-              >
-                <Copy className="w-3 h-3" />
-                {copied && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: -25 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute whitespace-nowrap bg-on-surface text-surface text-[8px] py-0.5 px-1 rounded font-bold"
-                  >
-                    Link Copied
-                  </motion.div>
-                )}
-              </button>
+            <div className="text-4xl xs:text-5xl font-black font-headline text-primary tracking-tight">{quiz.roomCode}</div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-on-surface-variant">
+              <span className="font-bold shrink-0">Live Link:</span>
+              <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded max-w-[200px] xs:max-w-xs overflow-hidden">
+                <span className="truncate">
+                  {window.location.origin}/join?code={quiz.roomCode.replace('-', '')}
+                </span>
+                <button 
+                  onClick={() => {
+                    let publicOrigin = window.location.origin;
+                    if (publicOrigin.includes('ais-dev')) {
+                      publicOrigin = publicOrigin.replace('ais-dev', 'ais-pre');
+                    }
+                    navigator.clipboard.writeText(`${publicOrigin}/join?code=${quiz.roomCode.replace('-', '')}`);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="p-1 hover:bg-surface-container-high rounded transition-colors relative shrink-0"
+                >
+                  <Copy className="w-3 h-3" />
+                  {copied && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: -25 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute whitespace-nowrap bg-on-surface text-surface text-[8px] py-0.5 px-1 rounded font-bold left-1/2 -translate-x-1/2"
+                    >
+                      Copied
+                    </motion.div>
+                  )}
+                </button>
+              </div>
               <button 
                 onClick={() => setShowQr(true)}
-                className="p-1 hover:bg-surface-container-high rounded transition-colors"
+                className="p-1.5 bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors shrink-0"
                 title="Show Join QR Code"
               >
-                <QrCode className="w-3 h-3" />
+                <QrCode className="w-4 h-4 text-primary" />
               </button>
             </div>
             {window.location.hostname.includes('ais-dev') && (
-              <p className="mt-2 text-[9px] text-emerald-600 font-medium flex items-center gap-1">
-                <Info className="w-2.5 h-2.5" />
-                Note: You are on a private dev link. The "Copy Link" button will automatically use the public "ais-pre" URL for your students.
+              <p className="mt-2 text-[9px] text-emerald-600 font-medium flex items-start gap-1 max-w-sm">
+                <Info className="w-2.5 h-2.5 mt-0.5 shrink-0" />
+                <span>Note: Preview link uses "ais-pre" for students.</span>
               </p>
             )}
           </div>
           <div className="flex flex-col gap-6 w-full lg:w-auto">
             <div className="flex flex-col items-center lg:items-end gap-2">
               <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Joined Students</div>
-              <div className="flex -space-x-3 justify-center overflow-hidden py-2">
+              <div className="flex -space-x-3 justify-center overflow-hidden py-2 max-w-full">
                 {participants.slice(0, 5).map((p, i) => {
                   const colors = [
                     'bg-blue-500', 'bg-purple-500', 'bg-emerald-500', 
@@ -343,27 +345,27 @@ export default function Dashboard() {
               </div>
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               {quiz.status === 'waiting' && (
                 <>
                   <button 
                     onClick={() => navigate(`/quiz-editor?edit=${quiz.id}`)}
-                    className="px-6 h-14 rounded-2xl bg-surface-container-low text-on-surface font-headline font-bold hover:bg-surface-container transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 sm:flex-none px-6 h-14 rounded-2xl bg-surface-container-low text-on-surface font-headline font-bold hover:bg-surface-container transition-colors flex items-center justify-center gap-2"
                   >
                     Edit Quiz
                   </button>
                   <button 
                     onClick={handleStartQuiz}
-                    className="px-8 h-14 rounded-2xl bg-primary text-white font-headline font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 sm:flex-none px-8 h-14 rounded-2xl bg-primary text-on-primary font-headline font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
-                    <Rocket className="w-5 h-5 text-white" />
+                    <Rocket className="w-5 h-5 text-on-primary" />
                     Start Quiz
                   </button>
                 </>
               )}
               <button 
                 onClick={() => setShowEndConfirm(true)}
-                className="px-6 h-14 rounded-2xl bg-error/10 text-error font-headline font-bold hover:bg-error/20 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 sm:flex-none px-6 h-14 rounded-2xl bg-error/10 text-error font-headline font-bold hover:bg-error/20 transition-colors flex items-center justify-center gap-2"
               >
                 End Quiz
               </button>
@@ -523,21 +525,21 @@ export default function Dashboard() {
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center max-w-sm w-full relative"
+                className="bg-surface-container-lowest p-10 rounded-[3rem] shadow-2xl flex flex-col items-center max-w-sm w-full relative border border-outline-variant/10"
               >
                 <button 
                   onClick={() => setShowQr(false)}
-                  className="absolute top-6 right-6 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="absolute top-6 right-6 p-2 hover:bg-surface-container-low rounded-full transition-colors"
                 >
-                  <X className="w-6 h-6 text-gray-500" />
+                  <X className="w-6 h-6 text-on-surface-variant" />
                 </button>
                 
                 <div className="text-center mb-8">
                   <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <QrCode className="w-8 h-8 text-primary" />
                   </div>
-                  <h3 className="font-headline text-2xl font-black text-gray-900 mb-1">Scan to Join</h3>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Room Code: {quiz.roomCode}</p>
+                  <h3 className="font-headline text-2xl font-black text-on-surface mb-1">Scan to Join</h3>
+                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Room Code: {quiz.roomCode}</p>
                 </div>
 
                 <div className="bg-white p-6 rounded-3xl border-4 border-primary/5 shadow-inner mb-8">

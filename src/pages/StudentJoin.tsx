@@ -314,7 +314,7 @@ export default function StudentJoin() {
                     className={cn(
                       "w-full py-4 px-6 rounded-xl font-headline font-bold text-lg flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg",
                       isCodeValid 
-                        ? "bg-primary text-white shadow-primary/20" 
+                        ? "bg-primary text-on-primary shadow-primary/20" 
                         : "bg-surface-container-highest text-on-surface-variant opacity-50 cursor-not-allowed"
                     )}
                   >

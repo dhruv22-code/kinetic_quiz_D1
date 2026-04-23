@@ -9,6 +9,7 @@
   --color-primary: var(--color-primary);
   --color-primary-dim: var(--color-primary-dim);
   --color-primary-container: var(--color-primary-container);
+  --color-on-primary: var(--color-on-primary);
   --color-secondary: var(--color-secondary);
   --color-secondary-dim: var(--color-secondary-dim);
   --color-secondary-container: var(--color-secondary-container);
@@ -32,6 +33,8 @@
   --color-on-surface-variant: var(--color-on-surface-variant);
   --color-outline: var(--color-outline);
   --color-outline-variant: var(--color-outline-variant);
+  
+  --breakpoint-xs: 400px;
 
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
@@ -43,6 +46,7 @@
     --color-primary: #004be2;
     --color-primary-dim: #0041c7;
     --color-primary-container: #809bff;
+    --color-on-primary: #ffffff;
     --color-secondary: #006a28;
     --color-secondary-dim: #005d22;
     --color-secondary-container: #5cfd80;
@@ -72,6 +76,7 @@
     --color-primary: #a8c7ff;
     --color-primary-dim: #8bb3ff;
     --color-primary-container: #004494;
+    --color-on-primary: #002f68;
     --color-secondary: #7af08d;
     --color-secondary-dim: #5edb73;
     --color-secondary-container: #00531c;

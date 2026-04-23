@@ -13,7 +13,7 @@ import { db, storage, handleFirestoreError, OperationType, isDemoMode } from "..
 import ThemeToggle from "../components/ThemeToggle";
 
 export default function Profile() {
-  const { user, profile, signOut, refreshProfile, changePassword } = useAuth();
+  const { user, profile, signOut, refreshProfile, changePassword, updateProfile } = useAuth();
   const { quizzes } = useQuiz();
   const location = useLocation();
   const [allParticipants, setAllParticipants] = useState<Participant[]>([]);
@@ -127,13 +127,24 @@ export default function Profile() {
     roll: profile?.roll || ''
   });
 
+  // Sync editedProfile when profile context changes or when entering edit mode
+  useEffect(() => {
+    if (!isEditing && profile) {
+      setEditedProfile({
+        full_name: profile.full_name || '',
+        bio: profile.bio || '',
+        department: profile.department || '',
+        role: profile.role || 'Educator',
+        roll: profile.roll || ''
+      });
+    }
+  }, [profile, isEditing]);
+
   const handleUpdateProfile = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, editedProfile);
-      await refreshProfile();
+      await updateProfile(editedProfile);
       setIsEditing(false);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);

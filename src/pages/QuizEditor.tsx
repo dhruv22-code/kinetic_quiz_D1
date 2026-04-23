@@ -538,7 +538,7 @@ export default function QuizEditor() {
   };
 
   return (
-    <div className="bg-surface min-h-screen pb-24">
+    <div className="bg-surface min-h-screen pb-24 overflow-x-hidden">
       <TopAppBar />
       
       <main className="max-w-5xl mx-auto px-6 pt-8">
@@ -550,38 +550,40 @@ export default function QuizEditor() {
                 {isEditing ? "Edit Quiz" : "Create New Quiz"}
               </h1>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap lg:flex-nowrap gap-3">
               {activeQuiz && (!isEditing || activeQuiz.id !== editId) && (
-                <div className="hidden lg:flex items-center px-4 py-2 bg-error/10 text-error text-xs font-bold rounded-lg border border-error/20 max-w-xs">
-                  An active quiz is already running. End it to create a new one.
+                <div className="flex lg:flex items-center px-4 py-2 bg-error/10 text-error text-[10px] sm:text-xs font-bold rounded-lg border border-error/20 max-w-full lg:max-w-xs">
+                  Active quiz running. End it to create new.
                 </div>
               )}
-              <button 
-                onClick={handleReset}
-                className="px-6 py-3 rounded-xl border border-error/20 text-error font-semibold hover:bg-error/5 transition-colors flex items-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Reset
-              </button>
-              <button 
-                onClick={handleSaveDraft}
-                className="px-6 py-3 rounded-xl border border-outline-variant/30 text-on-surface-variant font-semibold hover:bg-surface-container-low transition-colors"
-              >
-                Save Draft
-              </button>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <button 
+                  onClick={handleReset}
+                  className="flex-1 sm:flex-none px-4 sm:px-6 py-3 rounded-xl border border-error/20 text-error font-semibold hover:bg-error/5 transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Reset
+                </button>
+                <button 
+                  onClick={handleSaveDraft}
+                  className="flex-1 sm:flex-none px-4 sm:px-6 py-3 rounded-xl border border-outline-variant/30 text-on-surface-variant font-semibold hover:bg-surface-container-low transition-colors text-sm"
+                >
+                  Save Draft
+                </button>
+              </div>
               <button 
                 onClick={handleSave}
                 disabled={(!!activeQuiz && (!isEditing || activeQuiz.id !== editId)) || isSaving || hasValidationErrors}
                 className={cn(
-                  "px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95",
+                  "w-full sm:w-auto px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 text-sm",
                   (!!activeQuiz && (!isEditing || activeQuiz.id !== editId) || isSaving || hasValidationErrors)
                     ? "bg-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed grayscale"
-                    : "bg-gradient-to-r from-primary to-primary-dim text-white shadow-primary/20 hover:scale-[1.02]"
+                    : "bg-gradient-to-r from-primary to-primary-dim text-on-primary shadow-primary/20 hover:scale-[1.02]"
                 )}
               >
-                <span>{isSaving ? "Saving..." : (isEditing ? "Update & Save" : "Generate Room Code & Save")}</span>
+                <span>{isSaving ? "Saving..." : (isEditing ? "Update & Save" : "Generate Code & Save")}</span>
                 {hasValidationErrors ? (
-                  <Check className="w-5 h-5 opacity-20" /> // Using Check as a dummy icon when grayed
+                  <Check className="w-5 h-5 opacity-20" />
                 ) : (
                   <Rocket className={cn("w-5 h-5", isSaving && "animate-bounce")} />
                 )}
@@ -757,18 +759,18 @@ export default function QuizEditor() {
         </section>
 
         {/* Roll Number Restrictions */}
-        <section className="bg-surface-container-low p-8 rounded-2xl tonal-lift mb-12">
-          <div className="flex items-center justify-between mb-6">
+        <section className="bg-surface-container-low p-6 sm:p-8 rounded-2xl tonal-lift mb-12">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1 font-label">Roll Number Restrictions</label>
               <p className="text-[10px] text-on-surface-variant">Only students matching these patterns can join. Format: <code className="bg-surface-container-highest px-1 rounded">YEAR-CODE-START-END</code></p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               <input 
                 value={newPattern}
                 onChange={(e) => setNewPattern(e.target.value)}
                 placeholder="e.g. 2023-IMG-001-061"
-                className="bg-surface-container-lowest border-0 rounded-lg text-sm px-4 py-2 focus:ring-2 focus:ring-primary-container w-48"
+                className="flex-grow sm:flex-none bg-surface-container-lowest border-0 rounded-lg text-sm px-4 py-2 focus:ring-2 focus:ring-primary-container w-full sm:w-48"
               />
               <button 
                 onClick={() => {
@@ -781,7 +783,7 @@ export default function QuizEditor() {
                   setAllowedRollPatterns([...allowedRollPatterns, newPattern.trim().toUpperCase()]);
                   setNewPattern("");
                 }}
-                className="p-2 bg-primary text-white rounded-lg hover:bg-primary-dim transition-colors"
+                className="p-2 bg-primary text-on-primary rounded-lg hover:bg-primary-dim transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -814,24 +816,24 @@ export default function QuizEditor() {
               key={q.id}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="relative bg-surface-container-lowest p-8 rounded-2xl border-l-8 border-primary shadow-sm group"
+              className="relative bg-surface-container-lowest p-6 sm:p-8 rounded-2xl border-l-8 border-primary shadow-sm group overflow-hidden sm:overflow-visible"
             >
-              <div className="absolute -right-3 top-8 flex flex-col gap-2">
+              <div className="absolute right-2 sm:-right-3 top-2 sm:top-8 flex sm:flex-col gap-2 z-20">
                 <button 
                   onClick={() => handleRemoveQuestion(q.id)}
-                  className="p-2 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:text-error transition-colors"
+                  className="p-1.5 sm:p-2 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:text-error transition-colors bg-white/80 dark:bg-black/40 backdrop-blur-sm"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
                 <button 
                   onClick={() => handleCopyText(q.text, q.id)}
-                  className="p-2 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:text-primary transition-colors flex items-center justify-center"
+                  className="p-1.5 sm:p-2 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:text-primary transition-colors flex items-center justify-center bg-white/80 dark:bg-black/40 backdrop-blur-sm"
                   title="Copy question text"
                 >
                   {copiedId === q.id ? (
-                    <Check className="w-5 h-5 text-emerald-500 animate-in zoom-in duration-300" />
+                    <Check className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500 animate-in zoom-in duration-300" />
                   ) : (
-                    <Copy className="w-5 h-5" />
+                    <Copy className="w-4 h-4 sm:w-5 sm:h-5" />
                   )}
                 </button>
               </div>
@@ -870,9 +872,9 @@ export default function QuizEditor() {
 
                 <div className="flex-grow space-y-6">
                   <div>
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
                       <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label">Question Text</label>
-                        <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant/10 shadow-sm relative group/math">
+                        <div className="flex items-center gap-0.5 sm:gap-1 bg-surface-container-low px-1.5 py-1 rounded-lg border border-outline-variant/10 shadow-sm relative group/math scale-90 sm:scale-100 origin-right">
                           <button 
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
