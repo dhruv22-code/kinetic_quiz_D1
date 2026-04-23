@@ -182,9 +182,9 @@ export default function Profile() {
     try {
       // 1. Upload to Storage
       const fileName = `${user.uid}_${Date.now()}`;
-      const avatarRef = ref(storage, `avatars/${fileName}`);
+      const avatarRef = ref(storage, `avatars/${user.uid}/${fileName}`);
       
-      console.log('Starting upload to:', `avatars/${fileName}`);
+      console.log('Starting upload to:', `avatars/${user.uid}/${fileName}`);
       const uploadTask = uploadBytesResumable(avatarRef, file, { contentType: file.type });
       
       // Monitor progress
@@ -194,9 +194,12 @@ export default function Profile() {
           setUploadProgress(Math.round(progress));
           console.log('Upload progress:', Math.round(progress), '%');
         }, 
-        (error) => {
+        (error: any) => {
           console.error('Upload task error:', error);
-          setUploadError(`Upload failed: ${error.message}`);
+          const errorMsg = error.code === 'storage/unauthorized' 
+            ? "Permission denied. Please ensure you are logged in correctly."
+            : `Upload failed: ${error.message} (${error.code})`;
+          setUploadError(errorMsg);
           setUploadingAvatar(false);
         }, 
         async () => {
@@ -295,13 +298,126 @@ export default function Profile() {
         <div className="flex justify-end mb-4">
           <ThemeToggle />
         </div>
+
+        {/* Profile Header (Always visible) */}
+        <header className="mb-12 flex flex-col md:flex-row items-center gap-10">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative group"
+          >
+            <div className="absolute -inset-1 bg-gradient-to-br from-primary to-secondary rounded-full blur opacity-25 group-hover:opacity-50 transition-opacity"></div>
+            <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-surface-container shadow-xl">
+              {uploadingAvatar && !previewUrl ? (
+                <div className="absolute inset-0 bg-surface-container-high/80 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : null}
+              <img 
+                src={previewUrl || teacherInfo.avatar} 
+                alt={teacherInfo.name} 
+                className={cn(
+                  "w-full h-full object-cover transition-opacity",
+                  uploadingAvatar && previewUrl ? "opacity-50" : "opacity-100"
+                )}
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(teacherInfo.name)}&background=3b82f6&color=fff`;
+                }}
+              />
+              {uploadingAvatar && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="bg-primary/20 p-2 rounded-full backdrop-blur-sm">
+                    <span className="text-[10px] font-black text-primary">{uploadProgress}%</span>
+                  </div>
+                </div>
+              )}
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleAvatarUpload}
+                className="hidden"
+                accept="image/*"
+              />
+            </div>
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              className="absolute bottom-2 right-2 p-2.5 bg-primary text-on-primary rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-50 z-20"
+              title="Upload profile picture"
+            >
+              <Camera className="w-5 h-5" />
+            </button>
+          </motion.div>
+
+          <div className="flex-grow text-center md:text-left">
+            {uploadError && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="mb-4 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs font-medium"
+              >
+                {uploadError}
+              </motion.div>
+            )}
+            {uploadingAvatar && (
+              <div className="mb-4 flex items-center gap-2 text-primary text-xs font-bold">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                {uploadProgress < 100 ? `UPLOADING: ${uploadProgress}%` : 'FINALIZING...'}
+              </div>
+            )}
+            {!isEditing && (
+              <>
+                <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
+                  <h1 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight">{teacherInfo.name}</h1>
+                  <span className="px-4 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2 self-center md:self-auto">
+                    <Shield className="w-3 h-3" />
+                    {teacherInfo.role === 'educator' ? 'Educator' : teacherInfo.role === 'teacher' ? 'Educator' : 'Student'}
+                  </span>
+                  {(profile.role?.toLowerCase() === 'student') && profile.roll && (
+                    <span className="px-4 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2 self-center md:self-auto">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Roll: {profile.roll}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex flex-wrap justify-center md:justify-start gap-6 mb-6">
+                  <div className="flex items-center gap-2 text-on-surface-variant font-body">
+                    <Mail className="w-4 h-4 text-primary" />
+                    {teacherInfo.email}
+                  </div>
+                  <div className="flex items-center gap-2 text-on-surface-variant font-body">
+                    <Globe className="w-4 h-4 text-primary" />
+                    {teacherInfo.department}
+                  </div>
+                  <div className="flex items-center gap-2 text-on-surface-variant font-body">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    Joined {teacherInfo.joinedDate}
+                  </div>
+                </div>
+
+                <p className="text-on-surface-variant font-body leading-relaxed max-w-2xl mx-auto md:mx-0">
+                  {teacherInfo.bio}
+                </p>
+              </>
+            )}
+            {isEditing && (
+              <div className="flex flex-col gap-2">
+                <h1 className="font-headline text-2xl font-bold">Edit Profile Info</h1>
+                <p className="text-on-surface-variant text-sm">Update your details and click Save below.</p>
+              </div>
+            )}
+          </div>
+        </header>
+
         {isEditing ? (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-surface-container-lowest p-8 md:p-12 rounded-[3rem] border border-outline-variant/10 shadow-xl max-w-2xl mx-auto"
           >
-            <h2 className="font-headline text-3xl font-bold mb-8 text-center">Edit Profile</h2>
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">Full Name</label>
@@ -396,109 +512,6 @@ export default function Profile() {
           </motion.div>
         ) : (
           <>
-            <header className="mb-12 flex flex-col md:flex-row items-center gap-10">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="relative group"
-              >
-                <div className="absolute -inset-1 bg-gradient-to-br from-primary to-secondary rounded-full blur opacity-25 group-hover:opacity-50 transition-opacity"></div>
-                <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-surface-container shadow-xl">
-                  {uploadingAvatar && !previewUrl ? (
-                    <div className="absolute inset-0 bg-surface-container-high/80 flex items-center justify-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                  ) : null}
-                  <img 
-                    src={previewUrl || teacherInfo.avatar} 
-                    alt={teacherInfo.name} 
-                    className={cn(
-                      "w-full h-full object-cover transition-opacity",
-                      uploadingAvatar && previewUrl ? "opacity-50" : "opacity-100"
-                    )}
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      // Fallback if image fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(teacherInfo.name)}&background=3b82f6&color=fff`;
-                    }}
-                  />
-                  {uploadingAvatar && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="bg-primary/20 p-2 rounded-full backdrop-blur-sm">
-                        <span className="text-[10px] font-black text-primary">{uploadProgress}%</span>
-                      </div>
-                    </div>
-                  )}
-                  <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    onChange={handleAvatarUpload}
-                    className="hidden"
-                    accept="image/*"
-                  />
-                </div>
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingAvatar}
-                  className="absolute bottom-2 right-2 p-2.5 bg-primary text-on-primary rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-50"
-                  title="Upload profile picture"
-                >
-                  <Camera className="w-5 h-5" />
-                </button>
-              </motion.div>
-
-              <div className="flex-grow text-center md:text-left">
-                {uploadError && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="mb-4 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs font-medium"
-                  >
-                    {uploadError}
-                  </motion.div>
-                )}
-                {uploadingAvatar && (
-                  <div className="mb-4 flex items-center gap-2 text-primary text-xs font-bold">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    {uploadProgress < 100 ? `UPLOADING: ${uploadProgress}%` : 'FINALIZING...'}
-                  </div>
-                )}
-                <div className="flex flex-col md:flex-row md:items-center gap-4 mb-4">
-                  <h1 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight">{teacherInfo.name}</h1>
-                  <span className="px-4 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2 self-center md:self-auto">
-                    <Shield className="w-3 h-3" />
-                    {teacherInfo.role === 'educator' ? 'Educator' : teacherInfo.role === 'teacher' ? 'Educator' : 'Student'}
-                  </span>
-                  {(profile.role?.toLowerCase() === 'student') && profile.roll && (
-                    <span className="px-4 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-bold uppercase tracking-widest inline-flex items-center gap-2 self-center md:self-auto">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Roll: {profile.roll}
-                    </span>
-                  )}
-                </div>
-                
-                <div className="flex flex-wrap justify-center md:justify-start gap-6 mb-6">
-                  <div className="flex items-center gap-2 text-on-surface-variant font-body">
-                    <Mail className="w-4 h-4 text-primary" />
-                    {teacherInfo.email}
-                  </div>
-                  <div className="flex items-center gap-2 text-on-surface-variant font-body">
-                    <Globe className="w-4 h-4 text-primary" />
-                    {teacherInfo.department}
-                  </div>
-                  <div className="flex items-center gap-2 text-on-surface-variant font-body">
-                    <Calendar className="w-4 h-4 text-primary" />
-                    Joined {teacherInfo.joinedDate}
-                  </div>
-                </div>
-
-                <p className="text-on-surface-variant font-body leading-relaxed max-w-2xl mx-auto md:mx-0">
-                  {teacherInfo.bio}
-                </p>
-              </div>
-            </header>
-
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
               {[

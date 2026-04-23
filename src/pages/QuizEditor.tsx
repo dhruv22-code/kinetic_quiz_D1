@@ -88,6 +88,46 @@ export default function QuizEditor() {
   const [newPattern, setNewPattern] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [formatState, setFormatState] = useState({ bold: false, italic: false });
+  const [activeEditorId, setActiveEditorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      
+      const anchorNode = selection.anchorNode;
+      if (!anchorNode) return;
+
+      // Check if selection is inside a RichEditor
+      let parent = anchorNode.parentElement;
+      let isInsideRichEditor = false;
+      let editorId = null;
+
+      while (parent) {
+        if (parent.hasAttribute('contenteditable')) {
+          isInsideRichEditor = true;
+          editorId = parent.id;
+          break;
+        }
+        parent = parent.parentElement;
+      }
+
+      if (isInsideRichEditor) {
+        setActiveEditorId(editorId);
+        setFormatState({
+          bold: document.queryCommandState('bold'),
+          italic: document.queryCommandState('italic')
+        });
+      } else {
+        setActiveEditorId(null);
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
+
   // Auto-save logic to persist working progress
   useEffect(() => {
     const workingDraft = {
@@ -891,9 +931,16 @@ export default function QuizEditor() {
                                 el.focus();
                                 document.execCommand('bold', false);
                                 handleUpdateQuestion(q.id, { text: el.innerHTML });
+                                // Force state update
+                                setFormatState(prev => ({ ...prev, bold: document.queryCommandState('bold') }));
                               }
                             }}
-                            className="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant hover:text-primary transition-colors" 
+                            className={cn(
+                              "p-1.5 rounded transition-colors",
+                              (activeEditorId === `q-text-${q.id}` && formatState.bold) 
+                                ? "bg-primary text-on-primary shadow-sm" 
+                                : "hover:bg-surface-container-high text-on-surface-variant hover:text-primary"
+                            )}
                             title="Bold"
                           >
                             <Bold className="w-3.5 h-3.5" />
@@ -906,9 +953,16 @@ export default function QuizEditor() {
                                 el.focus();
                                 document.execCommand('italic', false);
                                 handleUpdateQuestion(q.id, { text: el.innerHTML });
+                                // Force state update
+                                setFormatState(prev => ({ ...prev, italic: document.queryCommandState('italic') }));
                               }
                             }}
-                            className="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant hover:text-primary transition-colors" 
+                            className={cn(
+                              "p-1.5 rounded transition-colors",
+                              (activeEditorId === `q-text-${q.id}` && formatState.italic) 
+                                ? "bg-primary text-on-primary shadow-sm" 
+                                : "hover:bg-surface-container-high text-on-surface-variant hover:text-primary"
+                            )}
                             title="Italic"
                           >
                             <Italic className="w-3.5 h-3.5" />
