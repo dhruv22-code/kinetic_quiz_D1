@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Navigate, useLocation } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import QuizEditor from "./pages/QuizEditor";
 import StudentJoin from "./pages/StudentJoin";
@@ -61,52 +61,85 @@ function RootRedirect() {
   return <Navigate to="/join" replace />;
 }
 
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <RootRedirect />,
+  },
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "/signup",
+    element: <SignUp />,
+  },
+  {
+    path: "/join",
+    element: <StudentJoin />,
+  },
+  {
+    path: "/quiz",
+    element: <StudentQuiz />,
+  },
+  {
+    path: "/score",
+    element: <StudentScore />,
+  },
+  {
+    path: "/onboarding",
+    element: (
+      <ProtectedRoute>
+        <Onboarding />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/dashboard",
+    element: (
+      <ProtectedRoute>
+        <Dashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/reports",
+    element: (
+      <ProtectedRoute>
+        <Reports />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/profile",
+    element: (
+      <ProtectedRoute>
+        <Profile />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/quiz-editor",
+    element: (
+      <ProtectedRoute>
+        <QuizEditor />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "*",
+    element: <Navigate to="/join" replace />,
+  },
+]);
+
 export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <QuizProvider>
-          <Router>
-            <div className="min-h-screen flex flex-col">
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<SignUp />} />
-                <Route path="/join" element={<StudentJoin />} />
-                <Route path="/quiz" element={<StudentQuiz />} />
-                <Route path="/score" element={<StudentScore />} />
-
-                {/* Protected Routes */}
-                <Route path="/" element={<RootRedirect />} />
-                <Route path="/onboarding" element={
-                  <ProtectedRoute>
-                    <Onboarding />
-                  </ProtectedRoute>
-                } />
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/reports" element={
-                  <ProtectedRoute>
-                    <Reports />
-                  </ProtectedRoute>
-                } />
-                <Route path="/profile" element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                } />
-                <Route path="/quiz-editor" element={
-                  <ProtectedRoute>
-                    <QuizEditor />
-                  </ProtectedRoute>
-                } />
-                <Route path="*" element={<Navigate to="/join" replace />} />
-              </Routes>
-            </div>
-          </Router>
+          <div className="min-h-screen flex flex-col">
+            <RouterProvider router={router} />
+          </div>
         </QuizProvider>
       </AuthProvider>
     </ThemeProvider>
