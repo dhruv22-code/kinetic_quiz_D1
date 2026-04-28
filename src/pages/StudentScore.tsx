@@ -166,7 +166,7 @@ export default function StudentScore() {
               <div className="space-y-1">
                 <h4 className="font-headline font-bold text-on-surface">Manual Evaluation Required</h4>
                 <p className="text-sm text-on-surface-variant leading-relaxed">
-                  This quiz contains paragraph-type questions. These are not included in your current score. Please ask your teacher to evaluate your paragraph answers for your final grade.
+                  This quiz contains paragraph-type questions. These are not included in your current score. Please request evaluation for your paragraph answers for your final grade.
                 </p>
               </div>
             </motion.div>
@@ -182,7 +182,7 @@ export default function StudentScore() {
                     className="w-full py-4 px-6 rounded-2xl bg-surface-container-high text-on-surface font-headline font-bold flex items-center justify-center gap-3 hover:bg-surface-container-highest transition-colors"
                   >
                     <MessageSquare className="w-5 h-5" />
-                    Ask Query to Teacher
+                    Ask Query
                   </button>
                 ) : (
                   <motion.div 
@@ -225,7 +225,7 @@ export default function StudentScore() {
                 className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center gap-3 text-emerald-700 font-bold"
               >
                 <CheckCircle2 className="w-5 h-5" />
-                Query submitted to teacher successfully!
+                Query submitted successfully!
               </motion.div>
             )}
             

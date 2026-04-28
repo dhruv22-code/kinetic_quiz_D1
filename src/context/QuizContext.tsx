@@ -163,7 +163,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
 
   // Track the ID of the quiz the teacher currently wants to monitor
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(() => {
-    return localStorage.getItem('monitoringQuizId');
+    return sessionStorage.getItem('monitoringQuizId');
   });
 
   const closeQuizEndedMessage = () => setQuizEnded(false);
@@ -171,14 +171,14 @@ export function QuizProvider({ children }: { children: ReactNode }) {
   const selectQuiz = (quizId: string | null) => {
     setSelectedQuizId(quizId);
     if (quizId) {
-      localStorage.setItem('monitoringQuizId', quizId);
+      sessionStorage.setItem('monitoringQuizId', quizId);
       const target = quizzes.find(q => q.id === quizId);
       if (target) {
         setQuiz(target);
         localStorage.setItem('activeRoomCode', target.roomCode);
       }
     } else {
-      localStorage.removeItem('monitoringQuizId');
+      sessionStorage.removeItem('monitoringQuizId');
       setQuiz(null);
       localStorage.removeItem('activeRoomCode');
     }
@@ -322,7 +322,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('activeRoomCode', activeQuiz.roomCode);
         if (!selectedQuizId || selectedQuizId !== activeQuiz.id) {
           setSelectedQuizId(activeQuiz.id!);
-          localStorage.setItem('monitoringQuizId', activeQuiz.id!);
+          sessionStorage.setItem('monitoringQuizId', activeQuiz.id!);
         }
       } else {
         // Only clear if we were previously in a teacher-like state (monitoring a quiz)
@@ -330,7 +330,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
           setQuiz(null);
           localStorage.removeItem('activeRoomCode');
           setSelectedQuizId(null);
-          localStorage.removeItem('monitoringQuizId');
+          sessionStorage.removeItem('monitoringQuizId');
         }
       }
     }, (error) => {

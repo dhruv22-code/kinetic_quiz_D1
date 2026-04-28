@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [showQr, setShowQr] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showRevertConfirm, setShowRevertConfirm] = useState(false);
+  const [showStartConfirm, setShowStartConfirm] = useState(false);
   const [showSwitchQuiz, setShowSwitchQuiz] = useState(false);
   const navigate = useNavigate();
 
@@ -76,8 +77,14 @@ export default function Dashboard() {
         return;
       }
       
-      await startSession(quiz.id);
+      setShowStartConfirm(true);
     }
+  };
+
+  const confirmStartQuiz = async () => {
+    if (!quiz?.id) return;
+    setShowStartConfirm(false);
+    await startSession(quiz.id);
   };
 
   const handleRevertToLobby = async () => {
@@ -348,8 +355,18 @@ export default function Dashboard() {
                               <div className="font-bold text-sm text-on-surface truncate pr-2">{q.title}</div>
                               <div className="text-[10px] font-black font-headline text-primary tracking-widest">{q.roomCode}</div>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center">
-                              <ArrowRight className="w-4 h-4 text-primary" />
+                            <div className="text-right flex flex-col items-end gap-1">
+                              <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center">
+                                <ArrowRight className="w-4 h-4 text-primary" />
+                              </div>
+                              <span className={cn(
+                                "text-[8px] font-bold uppercase px-1.5 py-0.5 rounded",
+                                q.status === 'waiting' ? "bg-amber-500/10 text-amber-600" :
+                                q.status === 'starting' ? "bg-primary/10 text-primary animate-pulse" :
+                                "bg-emerald-500/10 text-emerald-600"
+                              )}>
+                                {q.status}
+                              </span>
                             </div>
                           </button>
                         ))}
@@ -622,6 +639,45 @@ export default function Dashboard() {
             </div>
           )}
         </AnimatePresence>
+
+        {/* Start Session Confirmation Modal */}
+        <AnimatePresence>
+          {showStartConfirm && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-surface-container-lowest rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden relative"
+              >
+                <div className="p-8 text-center">
+                  <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <Radio className="w-8 h-8 text-primary animate-pulse" />
+                  </div>
+                  <h3 className="font-headline text-2xl font-bold mb-2">Ready to Start?</h3>
+                  <p className="text-on-surface-variant text-sm mb-8 leading-relaxed">
+                    This will initiate a {LOBBY_COUNTDOWN_SECONDS}-second countdown for all joined students. New students won't be able to join once started.
+                  </p>
+                  
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={confirmStartQuiz}
+                      className="w-full bg-primary text-on-primary font-headline font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                      Start Session Now
+                    </button>
+                    <button
+                      onClick={() => setShowStartConfirm(false)}
+                      className="w-full bg-surface-container-high text-on-surface font-headline font-bold py-4 rounded-2xl hover:bg-surface-container-highest transition-colors"
+                    >
+                      Wait, Not Yet
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
         
         {/* QR Code Modal */}
         <AnimatePresence>
@@ -724,15 +780,27 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
-        {/* Class List Table - Only visible in lobby mode (waiting) */}
-        {quiz.status === 'waiting' && (
+        {/* Class List Table - Visible in all active monitoring states */}
+        {(quiz.status === 'waiting' || quiz.status === 'starting' || quiz.status === 'active') && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-surface-container-lowest rounded-3xl shadow-[0_20px_40px_rgba(42,43,81,0.03)] overflow-hidden"
           >
             <div className="p-8 border-b border-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h3 className="font-headline text-2xl font-bold">Class List</h3>
+              <div>
+                <h3 className="font-headline text-2xl font-bold">Class List</h3>
+                <p className="text-on-surface-variant text-xs mt-1">
+                  {participants.filter(p => (p.lastSeen && Date.now() - p.lastSeen < 30000) || p.status === 'Submitted').length} / {participants.length} Active
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Live Syncing</span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               {participants.length > 0 ? (

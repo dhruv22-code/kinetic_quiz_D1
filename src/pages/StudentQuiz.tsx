@@ -612,7 +612,7 @@ export default function StudentQuiz() {
               <p className="text-on-surface-variant text-xl mb-12 font-medium">
                 {quiz?.status === 'starting' 
                   ? "The quiz is about to begin. Entry is now locked." 
-                  : "Waiting for your teacher to start the session..."}
+                  : "Waiting for the session to start..."}
               </p>
 
               <div className="space-y-6">
@@ -655,10 +655,42 @@ export default function StudentQuiz() {
                        </motion.div>
                      )}
                    </div>
-                   <div className="text-center mt-1">
-                     <p className="text-on-surface-variant text-[10px] font-bold uppercase tracking-widest leading-none">
+                   <div className="text-center mt-1 w-full max-w-sm">
+                     <p className="text-on-surface-variant text-[10px] font-bold uppercase tracking-widest leading-none mb-6">
                        {participants.length} {participants.length === 1 ? 'student' : 'students'} joined
                      </p>
+                     
+                     {/* Student Lobby Class List Table */}
+                     <div className="bg-surface-container-low/30 rounded-2xl overflow-hidden border border-outline-variant/10 text-left">
+                       <div className="max-h-48 overflow-y-auto">
+                         <table className="w-full text-left border-collapse">
+                           <thead className="sticky top-0 bg-surface-container-low shadow-sm z-20">
+                             <tr>
+                               <th className="px-4 py-2 text-[8px] font-bold uppercase tracking-widest text-on-surface-variant">Name</th>
+                               <th className="px-4 py-2 text-[8px] font-bold uppercase tracking-widest text-on-surface-variant text-right">Status</th>
+                             </tr>
+                           </thead>
+                           <tbody className="divide-y divide-outline-variant/10">
+                             {(participants || []).map((p, i) => (
+                               <tr key={p.roll || i} className="bg-transparent border-b border-outline-variant/5 last:border-0">
+                                 <td className="px-4 py-3 text-xs font-bold text-on-surface truncate max-w-[120px]">{p.name}</td>
+                                 <td className="px-4 py-3 text-right">
+                                   <div className="flex items-center justify-end gap-1.5">
+                                     <span className={cn(
+                                       "w-1.5 h-1.5 rounded-full",
+                                       (p.lastSeen && Date.now() - p.lastSeen < 30000) ? "bg-emerald-500 animate-pulse" : "bg-outline-variant"
+                                     )}></span>
+                                     <span className="text-[10px] font-medium text-on-surface-variant">
+                                       {(p.lastSeen && Date.now() - p.lastSeen < 30000) ? "Joined" : "Offline"}
+                                     </span>
+                                   </div>
+                                 </td>
+                               </tr>
+                             ))}
+                           </tbody>
+                         </table>
+                       </div>
+                     </div>
                    </div>
                 </div>
 
@@ -712,7 +744,7 @@ export default function StudentQuiz() {
             Quiz Ended
           </h2>
           <p className="text-on-surface-variant mb-8 leading-relaxed">
-            The quiz has been ended by the teacher. If you have any problems, please contact your teacher.
+            The quiz has ended. If you have any problems, please contact the coordinator.
           </p>
           <button 
             onClick={() => navigate("/join")}

@@ -89,8 +89,8 @@ export default function SignUp() {
           <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <UserPlus className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-2">Teacher Sign Up</h1>
-          <p className="text-on-surface-variant font-body">Create your educator account to start building quizzes.</p>
+          <h1 className="font-headline text-3xl font-extrabold text-on-surface tracking-tight mb-2">Sign Up</h1>
+          <p className="text-on-surface-variant font-body">Create your account to start building quizzes.</p>
         </div>
 
         <AnimatePresence mode="wait">
@@ -128,7 +128,7 @@ export default function SignUp() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
-                    placeholder="sarah_educator"
+                    placeholder="sarah_username"
                   />
                 </div>
               </div>
@@ -143,7 +143,7 @@ export default function SignUp() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body"
-                    placeholder="teacher@kinetic.edu"
+                    placeholder="user@gmail.com"
                   />
                 </div>
               </div>
@@ -157,7 +157,7 @@ export default function SignUp() {
                     onChange={(e) => setRole(e.target.value)}
                     className="w-full pl-12 pr-10 py-4 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body appearance-none cursor-pointer"
                   >
-                    <option value="teacher">Teacher / Educator</option>
+                    <option value="teacher">Educator</option>
                     <option value="admin">Administrator</option>
                     <option value="student">Student</option>
                   </select>

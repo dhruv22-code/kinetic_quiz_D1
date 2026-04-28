@@ -135,7 +135,7 @@ export default function StudentJoin() {
     // Roll number validation
     if (targetQuiz.allowedRollPatterns && targetQuiz.allowedRollPatterns.length > 0) {
       if (!isRollAllowed(roll, targetQuiz.allowedRollPatterns)) {
-        setError(`The allowed types are ${targetQuiz.allowedRollPatterns.join(", ")} for further assistance talk to teacher.`);
+        setError(`The allowed types are ${targetQuiz.allowedRollPatterns.join(", ")} for further assistance talk to coordinator.`);
         setIsValidating(false);
         return;
       }
@@ -195,7 +195,7 @@ export default function StudentJoin() {
         <div className="w-full max-w-lg">
           <div className="text-left mb-10">
             <h2 className="font-headline text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight mb-4">Join Quiz Room</h2>
-            <p className="text-on-surface-variant text-lg max-w-md">Enter your details and the unique 6-digit code provided by your educator.</p>
+            <p className="text-on-surface-variant text-lg max-w-md">Enter your details and the unique 6-digit code provided by the organizer.</p>
           </div>
 
           <div className="grid gap-6">
