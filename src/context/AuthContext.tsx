@@ -157,22 +157,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await signInWithPopup(auth, provider);
     } catch (error: any) {
-      console.error('Error signing in with Google:', error);
+      // Silence log for user cancellation to avoid console noise
+      if (error.code !== 'auth/popup-closed-by-user') {
+        console.error('Error signing in with Google:', error);
+      }
       
-      // Friendly error handling for common popup issues
-      if (error.code === 'auth/popup-closed-by-user') {
-        throw new Error("The sign-in window was closed before finishing. Please try again.");
+      // Friendly error mapping
+      if (error.code === 'auth/popup-blocked') {
+        throw new Error("The sign-in window was blocked by your browser. Please allow popups for this site or try opening the app in a new tab.");
       }
       if (error.code === 'auth/cancelled-popup-request') {
         throw new Error("Only one sign-in window can be open at a time. Please check for existing windows.");
-      }
-      if (error.code === 'auth/popup-blocked') {
-        throw new Error("The sign-in window was blocked by your browser. Please allow popups for this site or try opening the app in a new tab.");
       }
       if (error.code === 'auth/internal-error' && error.message?.includes('popup')) {
         throw new Error("An internal error occurred with the sign-in window. Try opening the app in a new web tab.");
       }
       
+      // For popup-closed-by-user or others, throw original error so caller can identify by code
       throw error;
     }
   };

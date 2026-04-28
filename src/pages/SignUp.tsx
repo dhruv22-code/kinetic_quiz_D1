@@ -68,7 +68,9 @@ export default function SignUp() {
       await signInWithGoogle();
       navigate('/onboarding');
     } catch (err: any) {
-      setError(err.message || "Failed to sign in with Google.");
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || "Failed to sign in with Google.");
+      }
     }
   };
 

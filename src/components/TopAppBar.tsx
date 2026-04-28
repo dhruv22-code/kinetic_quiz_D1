@@ -74,7 +74,16 @@ export default function TopAppBar({ variant = "standard", progress, currentTask,
                     location.pathname === "/dashboard" ? "text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"
                   )}
                 >
-                  {profile?.role === 'Student' ? 'Home' : 'Dashboard'}
+                  {profile?.role?.toLowerCase() === 'student' ? 'Home' : 'Dashboard'}
+                </Link>
+                <Link
+                  to="/quiz-editor"
+                  className={cn(
+                    "font-label font-medium transition-colors py-1",
+                    location.pathname === "/quiz-editor" ? "text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"
+                  )}
+                >
+                  Quizzes
                 </Link>
                 <Link
                   to="/join"
@@ -85,17 +94,15 @@ export default function TopAppBar({ variant = "standard", progress, currentTask,
                 >
                   Join
                 </Link>
-                {profile?.role !== 'Student' && (
-                  <Link
-                    to="/reports"
-                    className={cn(
-                      "font-label font-medium transition-colors py-1",
-                      location.pathname === "/reports" ? "text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"
-                    )}
-                  >
-                    Reports
-                  </Link>
-                )}
+                <Link
+                  to="/reports"
+                  className={cn(
+                    "font-label font-medium transition-colors py-1",
+                    location.pathname === "/reports" ? "text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"
+                  )}
+                >
+                  {profile?.role?.toLowerCase() === 'student' ? 'History' : 'Reports'}
+                </Link>
                 <Link
                   to="/profile"
                   className={cn(

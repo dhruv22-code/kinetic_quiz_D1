@@ -15,7 +15,7 @@ export default function StudentScore() {
   const [querySubmitting, setQuerySubmitting] = useState(false);
   const [querySubmitted, setQuerySubmitted] = useState(false);
 
-  const participant = participants.find(p => p.roll === currentStudentRoll);
+  const participant = (participants || []).find(p => p.roll === currentStudentRoll);
   
   useEffect(() => {
     // If no quiz or no student roll, redirect to join
@@ -46,7 +46,7 @@ export default function StudentScore() {
   const totalScorable = scorableQuestions.length;
   const hasParagraphs = participantQuestions.some(q => q.type === 'Paragraph');
 
-  const topperScore = truncateScore(Math.max(...participants.map(p => p.score || 0), 0));
+  const topperScore = truncateScore(Math.max(...(participants || []).map(p => p.score || 0), 0));
   
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -229,13 +229,24 @@ export default function StudentScore() {
               </motion.div>
             )}
             
-            <button
-              onClick={handleExit}
-              className="w-full py-4 px-6 rounded-2xl bg-primary text-on-primary font-headline font-bold flex items-center justify-center gap-3 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
-            >
-              <LogOut className="w-5 h-5" />
-              Exit Quiz
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={handleExit}
+                className="w-full py-4 px-6 rounded-2xl bg-surface-container-high text-on-surface font-headline font-bold flex items-center justify-center gap-3 hover:bg-surface-container-highest transition-colors"
+              >
+                <LogOut className="w-5 h-5 text-on-surface-variant" />
+                Exit Quiz
+              </button>
+              <button
+                onClick={() => {
+                  resetQuiz();
+                  navigate('/reports');
+                }}
+                className="w-full py-4 px-6 rounded-2xl bg-primary text-on-primary font-headline font-bold flex items-center justify-center gap-3 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+              >
+                View All Attempts
+              </button>
+            </div>
           </div>
 
           <p className="text-center text-xs text-on-surface-variant pt-4">

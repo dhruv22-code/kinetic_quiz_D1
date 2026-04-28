@@ -136,6 +136,7 @@ interface QuizContextType {
   resetParticipantSession: (quizId: string, roll: string) => Promise<void>;
   quizEnded: boolean;
   closeQuizEndedMessage: () => void;
+  selectQuiz: (quizId: string | null) => void;
   loading: boolean;
 }
 
@@ -160,7 +161,28 @@ export function QuizProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [quizEnded, setQuizEnded] = useState(false);
 
+  // Track the ID of the quiz the teacher currently wants to monitor
+  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(() => {
+    return localStorage.getItem('monitoringQuizId');
+  });
+
   const closeQuizEndedMessage = () => setQuizEnded(false);
+
+  const selectQuiz = (quizId: string | null) => {
+    setSelectedQuizId(quizId);
+    if (quizId) {
+      localStorage.setItem('monitoringQuizId', quizId);
+      const target = quizzes.find(q => q.id === quizId);
+      if (target) {
+        setQuiz(target);
+        localStorage.setItem('activeRoomCode', target.roomCode);
+      }
+    } else {
+      localStorage.removeItem('monitoringQuizId');
+      setQuiz(null);
+      localStorage.removeItem('activeRoomCode');
+    }
+  };
 
   const findQuizByRoomCode = async (code: string): Promise<Quiz | null> => {
     if (isDemoMode) {
@@ -240,9 +262,9 @@ export function QuizProvider({ children }: { children: ReactNode }) {
           setQuiz(prev => {
             if (prev?.id === active.id) {
               // Preserve questions if they are already loaded or if active has them
-              return { ...active, questions: prev.questions || active.questions };
+              return { ...active, questions: prev.questions || active.questions || [] };
             }
-            return active;
+            return { ...active, questions: active.questions || [] };
           });
           localStorage.setItem('activeRoomCode', active.roomCode);
         } else {
@@ -280,20 +302,35 @@ export function QuizProvider({ children }: { children: ReactNode }) {
       setLoading(false);
 
       // For teachers, automatically sync the 'quiz' state with the active quiz from Firestore
-      const activeQuiz = fetchedQuizzes.find(q => q.isActive);
+      const activeQuizzes = fetchedQuizzes.filter(q => q.isActive);
+      
+      // Try to find the exact quiz we are monitoring
+      let activeQuiz = activeQuizzes.find(q => q.id === selectedQuizId);
+      
+      // Fallback: if no quiz is selected but there are active ones, or if the selected one is no longer active
+      if (!activeQuiz && activeQuizzes.length > 0) {
+        activeQuiz = activeQuizzes[0];
+      }
+
       if (activeQuiz) {
         setQuiz(prev => {
           if (prev?.id === activeQuiz.id) {
-            return { ...activeQuiz, questions: prev.questions || activeQuiz.questions };
+            return { ...activeQuiz, questions: prev.questions || activeQuiz.questions || [] };
           }
-          return activeQuiz;
+          return { ...activeQuiz, questions: activeQuiz.questions || [] };
         });
         localStorage.setItem('activeRoomCode', activeQuiz.roomCode);
+        if (!selectedQuizId || selectedQuizId !== activeQuiz.id) {
+          setSelectedQuizId(activeQuiz.id!);
+          localStorage.setItem('monitoringQuizId', activeQuiz.id!);
+        }
       } else {
         // Only clear if we were previously in a teacher-like state (monitoring a quiz)
         if (localStorage.getItem('activeRoomCode')) {
           setQuiz(null);
           localStorage.removeItem('activeRoomCode');
+          setSelectedQuizId(null);
+          localStorage.removeItem('monitoringQuizId');
         }
       }
     }, (error) => {
@@ -346,10 +383,10 @@ export function QuizProvider({ children }: { children: ReactNode }) {
           const quizData = docSnap.data() as Quiz;
           setQuiz(prev => {
             if (!prev || prev.id !== docSnap.id) {
-              return { ...quizData, id: docSnap.id, questions: [] };
+              return { ...quizData, id: docSnap.id, questions: quizData.questions || [] };
             }
             // Preserve existing questions on update
-            return { ...prev, ...quizData, questions: prev.questions || [] };
+            return { ...prev, ...quizData, questions: prev.questions || quizData.questions || [] };
           });
         }
       }, (error) => {
@@ -448,11 +485,13 @@ export function QuizProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Check if there's already an active quiz
+    // Remove the restriction of only one active quiz to support multiple quiz hosting
+    /*
     const activeQuiz = quizzes.find(q => q.isActive);
     if (activeQuiz) {
       throw new Error("You already have an active quiz. Please end it before creating a new one.");
     }
+    */
 
     try {
       const quizzesRef = collection(db, 'quizzes');
@@ -1090,7 +1129,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <QuizContext.Provider value={{ quiz, quizzes, participants, currentStudentRoll, draftQuiz, drafts, createQuiz, resetQuiz, saveDraft, deleteDraft, clearCurrentDraft, updateQuiz, fetchQuizById, joinQuiz, updateParticipant, leaveLobby, endQuiz, startSession, cancelStart, findQuizByRoomCode, gradeParticipant, calculateScore, deleteQuiz, isRollAllowed, resetParticipantSession, quizEnded, closeQuizEndedMessage, loading }}>
+    <QuizContext.Provider value={{ quiz, quizzes, participants, currentStudentRoll, draftQuiz, drafts, createQuiz, resetQuiz, saveDraft, deleteDraft, clearCurrentDraft, updateQuiz, fetchQuizById, joinQuiz, updateParticipant, leaveLobby, endQuiz, startSession, cancelStart, findQuizByRoomCode, gradeParticipant, calculateScore, deleteQuiz, isRollAllowed, resetParticipantSession, quizEnded, closeQuizEndedMessage, selectQuiz, loading }}>
       {children}
     </QuizContext.Provider>
   );

@@ -28,7 +28,7 @@ export default function StudentJoin() {
   // Session Guardian: If already joined an active session, don't allow staying on join page
   useEffect(() => {
     if (quiz && currentStudentRoll && quiz.status !== 'finished' && !searchParams.get('error')) {
-      const p = participants.find(part => part.roll === currentStudentRoll);
+      const p = (participants || []).find(part => part.roll === currentStudentRoll);
       if (p && p.status !== 'Submitted') {
         navigate("/quiz");
       }
@@ -145,7 +145,7 @@ export default function StudentJoin() {
       await joinQuiz({ name, roll }, targetQuiz);
       
       // Check if this student already submitted
-      const p = participants.find(part => part.roll === roll);
+      const p = (participants || []).find(part => part.roll === roll);
       if (p?.status === 'Submitted') {
         navigate("/score");
       } else {
@@ -258,7 +258,7 @@ export default function StudentJoin() {
                           </div>
                           <div className="text-right">
                              <div className="flex -space-x-2 mb-1 justify-end">
-                               {participants.slice(0, 3).map((p, i) => (
+                               {(participants || []).slice(0, 3).map((p, i) => (
                                  <div key={p.roll || i} className={cn(
                                    "w-6 h-6 rounded-full ring-2 ring-emerald-50 flex items-center justify-center text-[8px] font-bold text-white",
                                    ['bg-blue-400', 'bg-purple-400', 'bg-orange-400'][i % 3]
@@ -266,14 +266,14 @@ export default function StudentJoin() {
                                    {p.name ? p.name.charAt(0) : '?'}
                                  </div>
                                ))}
-                               {participants.length > 3 && (
+                               {(participants || []).length > 3 && (
                                  <div className="w-6 h-6 rounded-full ring-2 ring-emerald-50 bg-emerald-200 flex items-center justify-center text-[8px] font-bold text-emerald-700">
-                                   +{participants.length - 3}
+                                   +{(participants || []).length - 3}
                                  </div>
                                )}
                              </div>
                              <div className="text-[8px] font-bold text-emerald-600 uppercase tracking-tighter">
-                               {participants.length} Joining
+                               {(participants || []).length} Joining
                              </div>
                           </div>
                         </div>

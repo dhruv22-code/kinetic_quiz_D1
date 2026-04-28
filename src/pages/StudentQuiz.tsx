@@ -18,7 +18,7 @@ export default function StudentQuiz() {
   const { quiz, currentStudentRoll, updateParticipant, leaveLobby, participants, calculateScore, loading: quizLoading } = useQuiz();
   const navigate = useNavigate();
   
-  const participant = participants.find(p => p.roll === currentStudentRoll);
+  const participant = (participants || []).find(p => p.roll === currentStudentRoll);
   const currentQuestionIndex = participant?.progress ?? 0;
 
   // Lobby countdown state
@@ -48,9 +48,9 @@ export default function StudentQuiz() {
   
   // Get the current question based on shuffled order
   const currentQuestionId = participant?.questionOrder?.[currentQuestionIndex];
-  const currentQuestion = quiz?.questions.find(q => q.id === currentQuestionId);
+  const currentQuestion = quiz?.questions?.find(q => q.id === currentQuestionId);
   
-  const totalQuestions = participant?.questionOrder?.length || quiz?.questions.length || 0;
+  const totalQuestions = participant?.questionOrder?.length || quiz?.questions?.length || 0;
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
   
   const [response, setResponse] = useState("");
@@ -82,8 +82,8 @@ export default function StudentQuiz() {
         const incomingAttempts = participant.cheatingAttempts;
         setCheatAttempts(incomingAttempts);
         
-        // Auto-show warning if they just re-entered with 1 strike
-        if (incomingAttempts === 1 && !showCheatWarning && !isFinished && !isDisqualified) {
+        // Auto-show warning if they just re-entered with strikes - ONLY when quiz is active
+        if ((incomingAttempts === 1 || incomingAttempts === 2) && quiz?.status === 'active' && !showCheatWarning && !isFinished && !isDisqualified) {
           setShowCheatWarning(true);
         }
       }
@@ -91,38 +91,49 @@ export default function StudentQuiz() {
         setIsDisqualified(true);
       }
     }
-  }, [participant?.cheatingAttempts, participant?.isDisqualified]);
+  }, [participant?.cheatingAttempts, participant?.isDisqualified, quiz?.status]);
 
   // Internal Navigation Blocker (Detect going back or navigating away)
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       !isFinished && 
       !isDisqualified && 
-      (quiz?.status === 'active' || quiz?.status === 'starting' || quiz?.status === 'waiting') &&
+      quiz?.status === 'active' &&
+      !!currentQuestion &&
       currentLocation.pathname !== nextLocation.pathname
   );
 
   useEffect(() => {
     if (blocker.state === "blocked") {
       const triggerNavStrike = async () => {
+        // Double check current blockers state inside async closure
+        if (blocker.state !== "blocked") return;
+
         const newAttempts = cheatAttemptsRef.current + 1;
         setCheatAttempts(newAttempts);
         
-        if (newAttempts === 1) {
+        if (newAttempts <= 2) {
           setShowCheatWarning(true);
           if (currentStudentRoll) {
-            await updateParticipant(currentStudentRoll, { cheatingAttempts: 1 });
+            await updateParticipant(currentStudentRoll, { cheatingAttempts: newAttempts });
           }
           // We let them proceed (leave) because the user wants to allow "going outside and re-entering"
-          blocker.proceed?.();
+          if (blocker.state === "blocked") {
+            blocker.proceed();
+          }
         } else {
+          // Disqualify but allow the navigation to proceed if it's the score page or just let it proceed
           await handleDisqualification();
-          blocker.proceed?.();
+          // After disqualification, handleDisqualification already navigates to /score
+          // If navigation above didn't happen for some reason, we reset the blocker
+          if (blocker.state === "blocked") {
+            blocker.reset();
+          }
         }
       };
       triggerNavStrike();
     }
-  }, [blocker.state, currentStudentRoll, isFinished, isDisqualified]);
+  }, [blocker.state, currentStudentRoll]);
 
   // Tab Exclusivity Check (BroadcastChannel prevents multiple tabs of the same user)
   useEffect(() => {
@@ -205,7 +216,7 @@ export default function StudentQuiz() {
 
   // Cheat Prevention (Tab switching)
   useEffect(() => {
-    if (!currentStudentRoll || isFinished || quizEnded || isDisqualified || (quiz?.status !== 'active' && quiz?.status !== 'starting' && quiz?.status !== 'waiting')) return;
+    if (!currentStudentRoll || isFinished || quizEnded || isDisqualified || quiz?.status !== 'active' || !currentQuestion) return;
 
     // History Trap: Push a dummy state so back-button triggers popstate instead of leaving immediately
     if (!isTrappedRef.current) {
@@ -219,13 +230,13 @@ export default function StudentQuiz() {
       const newAttempts = cheatAttemptsRef.current + 1;
       setCheatAttempts(newAttempts);
 
-      if (newAttempts === 1) {
+      if (newAttempts <= 2) {
         setShowCheatWarning(true);
-        // Persist the first warning to database for re-entry situations
+        // Persist the warning to database for re-entry situations
         if (currentStudentRoll) {
-          await updateParticipant(currentStudentRoll, { cheatingAttempts: 1 });
+          await updateParticipant(currentStudentRoll, { cheatingAttempts: newAttempts });
         }
-      } else if (newAttempts >= 2) {
+      } else if (newAttempts >= 3) {
         handleDisqualification();
       }
     };
@@ -294,7 +305,7 @@ export default function StudentQuiz() {
         progress: currentQuestionIndex,
         isDisqualified: true,
         score,
-        cheatingAttempts: 2
+        cheatingAttempts: Math.max(cheatAttemptsRef.current, 3)
       });
       
       setIsFinished(true);
@@ -608,7 +619,7 @@ export default function StudentQuiz() {
                 <div className="flex flex-col items-center gap-2">
                    <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Joined Students</div>
                    <div className="flex -space-x-3 justify-center overflow-hidden py-2">
-                     {participants.slice(0, 5).map((p, i) => {
+                     {(participants || []).slice(0, 5).map((p, i) => {
                        const colors = [
                          'bg-blue-500', 'bg-purple-500', 'bg-emerald-500', 
                          'bg-orange-500', 'bg-rose-500', 'bg-indigo-500',
@@ -769,8 +780,10 @@ export default function StudentQuiz() {
               <div className="bg-error/5 p-6 rounded-2xl border border-error/10">
                 <p className="text-error font-bold">
                   {cheatAttempts === 1 
-                    ? "This is your LAST warning. Repeating this will result in immediate disqualification." 
-                    : "You are being disqualified."}
+                    ? "Warning 1 of 2: Please stay on this screen to ensure your responses are recorded correctly." 
+                    : cheatAttempts === 2
+                    ? "LAST warning: This is your second attempt. Repeating this one more time will result in immediate disqualification."
+                    : "You are being disqualified for repeated violations."}
                 </p>
               </div>
               <button 

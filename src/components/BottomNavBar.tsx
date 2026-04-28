@@ -11,6 +11,7 @@ export default function BottomNavBar() {
 
   const navItems = isStudent ? [
     { icon: LayoutDashboard, label: "Home", path: "/dashboard" },
+    { icon: BarChart3, label: "History", path: "/reports" },
     { icon: Radio, label: "Join", path: "/join" },
     { icon: User, label: "Profile", path: "/profile" },
   ] : [

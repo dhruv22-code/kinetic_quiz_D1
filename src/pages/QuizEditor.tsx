@@ -504,11 +504,6 @@ export default function QuizEditor() {
       return;
     }
 
-    if (activeQuiz && (!isEditing || activeQuiz.id !== editId)) {
-      setValidationError("You already have an active quiz session. Please end it from the dashboard before creating a new one.");
-      return;
-    }
-
     setValidationError(null);
     setIsSaving(true);
     console.log("Starting handleSave, isEditing:", isEditing, "editId:", editId);
@@ -599,11 +594,6 @@ export default function QuizEditor() {
               </h1>
             </div>
             <div className="flex flex-wrap lg:flex-nowrap gap-3">
-              {activeQuiz && (!isEditing || activeQuiz.id !== editId) && (
-                <div className="flex lg:flex items-center px-4 py-2 bg-error/10 text-error text-[10px] sm:text-xs font-bold rounded-lg border border-error/20 max-w-full lg:max-w-xs">
-                  Active quiz running. End it to create new.
-                </div>
-              )}
               <div className="flex gap-2 w-full sm:w-auto">
                 <button 
                   onClick={handleReset}
@@ -621,10 +611,10 @@ export default function QuizEditor() {
               </div>
               <button 
                 onClick={handleSave}
-                disabled={(!!activeQuiz && (!isEditing || activeQuiz.id !== editId)) || isSaving || hasValidationErrors}
+                disabled={isSaving || hasValidationErrors}
                 className={cn(
                   "w-full sm:w-auto px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 text-sm",
-                  (!!activeQuiz && (!isEditing || activeQuiz.id !== editId) || isSaving || hasValidationErrors)
+                  (isSaving || hasValidationErrors)
                     ? "bg-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed grayscale"
                     : "bg-gradient-to-r from-primary to-primary-dim text-on-primary shadow-primary/20 hover:scale-[1.02]"
                 )}

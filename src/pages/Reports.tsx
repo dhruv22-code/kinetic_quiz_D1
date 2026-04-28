@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useQuiz, Participant, Quiz, Question } from "@/src/context/QuizContext";
 import { cn } from "@/src/lib/utils";
 import { useState, useEffect, useMemo } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where, collectionGroup, getDoc, doc } from "firebase/firestore";
 import { db, handleFirestoreError, OperationType } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 
@@ -16,9 +16,10 @@ import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
 
 export default function Reports() {
-  const { quizzes, calculateScore: getRawScore, loading: quizLoading, deleteQuiz, resetParticipantSession } = useQuiz();
-  const { user } = useAuth();
+  const { quizzes: authoredQuizzes, calculateScore: getRawScore, loading: quizLoading, deleteQuiz, resetParticipantSession } = useQuiz();
+  const { user, profile } = useAuth();
   const [allParticipants, setAllParticipants] = useState<Participant[]>([]);
+  const [studentQuizzes, setStudentQuizzes] = useState<Quiz[]>([]);
   const [quizQuestionsMap, setQuizQuestionsMap] = useState<Record<string, Question[]>>({});
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -34,45 +35,85 @@ export default function Reports() {
   const [viewingQuestionPaper, setViewingQuestionPaper] = useState(false);
   const { gradeParticipant } = useQuiz();
 
+  const isTeacher = profile?.role?.toLowerCase() === 'educator' || profile?.role?.toLowerCase() === 'teacher';
+
   useEffect(() => {
     let isMounted = true;
-    const fetchParticipants = async () => {
-      if (!user || quizzes.length === 0) {
+    const fetchData = async () => {
+      if (!user) {
         setLoadingParticipants(false);
         return;
       }
       
       setLoadingParticipants(true);
       try {
-        // Optimization: Fetch responses for all quizzes in parallel
-        // We only NEED the responses for stats and the list.
-        // We DON'T need questions for all quizzes here because scores are already saved in participant docs
-        const results = await Promise.all(quizzes.map(async (quiz) => {
-          if (!quiz.id) return { quizId: '', responses: [] };
+        if (isTeacher) {
+          // TEACHER LOGIC: Fetch responses for all quizzes they authored
+          if (authoredQuizzes.length === 0) {
+            setAllParticipants([]);
+            setLoadingParticipants(false);
+            return;
+          }
 
-          const responsesRef = collection(db, 'quizzes', quiz.id, 'responses');
-          const snapshot = await getDocs(responsesRef);
-          const responses = snapshot.docs.map(doc => ({ 
-            id: doc.id, 
-            ...doc.data() 
+          const results = await Promise.all(authoredQuizzes.map(async (quiz) => {
+            if (!quiz.id) return { quizId: '', responses: [] };
+            const responsesRef = collection(db, 'quizzes', quiz.id, 'responses');
+            const snapshot = await getDocs(responsesRef);
+            return { 
+              quizId: quiz.id, 
+              responses: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Participant))
+            };
+          }));
+
+          if (!isMounted) return;
+          const participantsList: Participant[] = [];
+          results.forEach(res => { if (res.quizId) participantsList.push(...res.responses); });
+          setAllParticipants(participantsList);
+        } else {
+          // STUDENT LOGIC: Fetch only THEIR responses across all quizzes
+          const responsesQuery = query(
+            collectionGroup(db, 'responses'),
+            where('studentId', '==', user.uid)
+          );
+          
+          let snapshot;
+          try {
+            snapshot = await getDocs(responsesQuery);
+          } catch (err) {
+            handleFirestoreError(err, OperationType.LIST, 'responses_collection_group');
+            return;
+          }
+
+          if (!isMounted) return;
+
+          const myResponses = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
           } as Participant));
 
-          return { quizId: quiz.id, responses };
-        }));
+          setAllParticipants(myResponses);
 
-        if (!isMounted) return;
+          // Fetch Quiz details for these responses
+          const quizIds = [...new Set(myResponses.map(r => r.quizId).filter(id => !!id) )] as string[];
+          const quizResults = await Promise.all(quizIds.map(async (id) => {
+            try {
+              const quizRef = doc(db, 'quizzes', id);
+              const quizSnap = await getDoc(quizRef);
+              if (quizSnap.exists()) {
+                return { id: quizSnap.id, ...quizSnap.data() } as Quiz;
+              }
+            } catch (err) {
+              console.warn(`Could not fetch quiz ${id}:`, err);
+            }
+            return null;
+          }));
 
-        const participantsList: Participant[] = [];
-        results.forEach(res => {
-          if (res.quizId) {
-            participantsList.push(...res.responses);
-          }
-        });
-        
-        setAllParticipants(participantsList);
+          if (!isMounted) return;
+          setStudentQuizzes(quizResults.filter(q => q !== null) as Quiz[]);
+        }
       } catch (err) {
         if (isMounted) {
-          handleFirestoreError(err, OperationType.LIST, 'responses');
+          handleFirestoreError(err, OperationType.LIST, isTeacher ? 'authored_quizzes_responses' : 'student_history_fetch');
         }
       } finally {
         if (isMounted) {
@@ -81,9 +122,11 @@ export default function Reports() {
       }
     };
 
-    fetchParticipants();
+    fetchData();
     return () => { isMounted = false; };
-  }, [user, JSON.stringify(quizzes.map(q => q.id)), refreshTrigger]);
+  }, [user, JSON.stringify(authoredQuizzes.map(q => q.id)), refreshTrigger, isTeacher]);
+
+  const effectiveQuizzes = isTeacher ? authoredQuizzes : studentQuizzes;
 
   // Fetch questions ONLY when a quiz is selected
   useEffect(() => {
@@ -130,7 +173,7 @@ export default function Reports() {
     let scoredParticipants = 0;
 
     allParticipants.forEach(p => {
-      const quiz = quizzes.find(q => q.id === p.quizId);
+      const quiz = (effectiveQuizzes || []).find(q => q.id === p.quizId);
       if (quiz && (p.status === 'Submitted' || p.isDisqualified)) {
         totalScore += getParticipantPercentage(p, quiz);
         scoredParticipants++;
@@ -140,21 +183,21 @@ export default function Reports() {
     const avgScore = scoredParticipants > 0 ? Math.round(totalScore / scoredParticipants) : 0;
     
     return {
-      totalQuizzes: quizzes.length,
+      totalQuizzes: effectiveQuizzes.length,
       totalParticipants,
       avgScore: `${avgScore}%`
     };
-  }, [quizzes, allParticipants, quizQuestionsMap]);
+  }, [effectiveQuizzes, allParticipants, quizQuestionsMap]);
 
   const filteredQuizzes = useMemo(() => {
-    return [...quizzes]
+    return [...effectiveQuizzes]
       .filter(q => q.title.toLowerCase().includes(searchQuery.toLowerCase()))
       .sort((a, b) => {
         const dateA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt || 0).getTime();
         const dateB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt || 0).getTime();
         return dateB - dateA;
       });
-  }, [quizzes, searchQuery]);
+  }, [effectiveQuizzes, searchQuery]);
 
   const getQuizStats = (quiz: Quiz) => {
     const participants = allParticipants.filter(p => p.quizId === quiz.id);
@@ -320,56 +363,72 @@ export default function Reports() {
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 text-indigo-600 rounded-xl font-bold text-sm hover:bg-indigo-500/20 transition-all border border-indigo-500/20"
                   >
                     <FileText className="w-4 h-4" />
-                    View Question Paper
+                    {isTeacher ? "View Question Paper" : "View Questions"}
                   </button>
-                  <button 
-                    onClick={() => setShowDeleteConfirm(selectedQuiz.id || null)}
-                    disabled={selectedQuiz.isActive}
-                    className="flex items-center gap-2 px-4 py-2 bg-error/10 text-error rounded-xl font-bold text-sm hover:bg-error/20 transition-all disabled:opacity-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Quiz
-                  </button>
+                  {isTeacher && (
+                    <button 
+                      onClick={() => setShowDeleteConfirm(selectedQuiz.id || null)}
+                      disabled={selectedQuiz.isActive}
+                      className="flex items-center gap-2 px-4 py-2 bg-error/10 text-error rounded-xl font-bold text-sm hover:bg-error/20 transition-all disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Quiz
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-xs font-label font-bold uppercase tracking-widest text-on-surface-variant mb-1">Average Score</p>
+                  <p className="text-xs font-label font-bold uppercase tracking-widest text-on-surface-variant mb-1">
+                    {isTeacher ? "Average Score" : "Your Final Score"}
+                  </p>
                   <p className="text-3xl font-headline font-black text-primary">
-                    {getQuizStats(selectedQuiz).avgRawScore}
+                    {isTeacher ? getQuizStats(selectedQuiz).avgRawScore : ((allParticipants || []).find(p => p.quizId === selectedQuiz.id)?.score || 0)}
                     <span className="text-sm text-on-surface-variant/50 ml-1">/{selectedQuiz.drawCount || selectedQuiz.totalQuestions}</span>
                   </p>
                 </div>
                 <div className="w-px h-12 bg-outline-variant/30 mx-2"></div>
                 <div className="text-right">
-                  <p className="text-xs font-label font-bold uppercase tracking-widest text-on-surface-variant mb-1">Participants</p>
-                  <p className="text-3xl font-headline font-black text-on-surface">{getQuizStats(selectedQuiz).count}</p>
+                  <p className="text-xs font-label font-bold uppercase tracking-widest text-on-surface-variant mb-1">
+                    {isTeacher ? "Participants" : "Rank"}
+                  </p>
+                  <p className="text-3xl font-headline font-black text-on-surface">
+                    {isTeacher ? getQuizStats(selectedQuiz).count : "1"}
+                  </p>
                 </div>
               </div>
             </header>
 
             <div className="bg-surface-container-lowest rounded-3xl border border-outline-variant/10 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-outline-variant/10 flex items-center justify-between">
-                <h2 className="font-headline font-bold text-xl text-on-surface">Student Performance</h2>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => setShowQueriesOnly(!showQueriesOnly)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all",
-                      showQueriesOnly ? "bg-error text-white shadow-lg shadow-error/20" : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
-                    )}
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    {showQueriesOnly ? "Showing Queries" : "Filter Queries"}
-                  </button>
-                </div>
+                <h2 className="font-headline font-bold text-xl text-on-surface">
+                  {isTeacher ? "Student Performance" : "Your Submission"}
+                </h2>
+                {isTeacher && (
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setShowQueriesOnly(!showQueriesOnly)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all",
+                        showQueriesOnly ? "bg-error text-white shadow-lg shadow-error/20" : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+                      )}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      {showQueriesOnly ? "Showing Queries" : "Filter Queries"}
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-surface-container-low/50">
-                      <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Rank</th>
-                      <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Student</th>
+                      <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">
+                        {isTeacher ? "Rank" : "#"}
+                      </th>
+                      <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">
+                        {isTeacher ? "Student" : "Name"}
+                      </th>
                       <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Roll Number</th>
                       <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Progress</th>
                       <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Score</th>
@@ -450,7 +509,7 @@ export default function Reports() {
                                     Offline
                                   </span>
                                 )}
-                                {selectedQuiz.questions?.some(q => q.type === 'Paragraph') && p.status === 'Submitted' && (
+                                {isTeacher && selectedQuiz.questions?.some(q => q.type === 'Paragraph') && p.status === 'Submitted' && (
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -463,19 +522,21 @@ export default function Reports() {
                                     <ClipboardList className="w-4 h-4" />
                                   </button>
                                 )}
-                                <button 
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (confirm(`Unlock ${p.name} (${p.roll})? This will allow them to rejoin even if they were active or disqualified.`)) {
-                                      await resetParticipantSession(selectedQuiz.id!, p.roll);
-                                      setRefreshTrigger(prev => prev + 1);
-                                    }
-                                  }}
-                                  className="p-1.5 bg-amber-500/10 text-amber-600 rounded-lg hover:bg-amber-500/20 transition-colors ml-1"
-                                  title="Reset/Unlock Session"
-                                >
-                                  <Unlock className="w-4 h-4" />
-                                </button>
+                                {isTeacher && (
+                                  <button 
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (confirm(`Unlock ${p.name} (${p.roll})? This will allow them to rejoin even if they were active or disqualified.`)) {
+                                        await resetParticipantSession(selectedQuiz.id!, p.roll);
+                                        setRefreshTrigger(prev => prev + 1);
+                                      }
+                                    }}
+                                    className="p-1.5 bg-amber-500/10 text-amber-600 rounded-lg hover:bg-amber-500/20 transition-colors ml-1"
+                                    title="Reset/Unlock Session"
+                                  >
+                                    <Unlock className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -847,8 +908,12 @@ export default function Reports() {
             <header className="mb-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h1 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight mb-2">Quiz Reports</h1>
-              <p className="text-on-surface-variant font-body text-lg">Analyze student performance and engagement metrics.</p>
+              <h1 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight mb-2">
+                {isTeacher ? "Quiz Reports" : "Attempt History"}
+              </h1>
+              <p className="text-on-surface-variant font-body text-lg">
+                {isTeacher ? "Analyze student performance and engagement metrics." : "Review your quiz performance and answers."}
+              </p>
             </div>
             
             <div className="flex items-center gap-3">
@@ -877,9 +942,24 @@ export default function Reports() {
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           {[
-            { label: "Total Quizzes", value: stats.totalQuizzes, icon: ClipboardList, color: "bg-blue-500" },
-            { label: "Total Participants", value: stats.totalParticipants.toLocaleString(), icon: Users, color: "bg-purple-500" },
-            { label: "Avg. Score", value: stats.avgScore, icon: Award, color: "bg-amber-500" },
+            { 
+              label: isTeacher ? "Total Quizzes" : "Quizzes Taken", 
+              value: stats.totalQuizzes, 
+              icon: ClipboardList, 
+              color: "bg-blue-500" 
+            },
+            { 
+              label: isTeacher ? "Total Participants" : "Global Rank (Avg)", 
+              value: isTeacher ? stats.totalParticipants.toLocaleString() : "N/A", 
+              icon: Users, 
+              color: "bg-purple-500" 
+            },
+            { 
+              label: "Avg. Score", 
+              value: stats.avgScore, 
+              icon: Award, 
+              color: "bg-amber-500" 
+            },
           ].map((stat, i) => (
             <motion.div 
               key={stat.label}
@@ -902,9 +982,11 @@ export default function Reports() {
         {/* Reports Table */}
         <div className="bg-surface-container-lowest rounded-3xl border border-outline-variant/10 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-outline-variant/10 flex items-center justify-between">
-            <h2 className="font-headline font-bold text-xl text-on-surface">Recent Quiz Performance</h2>
+            <h2 className="font-headline font-bold text-xl text-on-surface">
+              {isTeacher ? "Recent Quiz Performance" : "Your Attempts"}
+            </h2>
             <AnimatePresence>
-              {selectedQuizIds.length > 0 && (
+              {isTeacher && selectedQuizIds.length > 0 && (
                 <motion.div 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -932,18 +1014,26 @@ export default function Reports() {
               <thead>
                 <tr className="bg-surface-container-low/50">
                   <th className="px-6 py-4 w-12">
-                    <input 
-                      type="checkbox"
-                      checked={filteredQuizzes.length > 0 && selectedQuizIds.length === filteredQuizzes.length}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 rounded border-outline focus:ring-primary text-primary"
-                    />
+                    {isTeacher && (
+                      <input 
+                        type="checkbox"
+                        checked={filteredQuizzes.length > 0 && selectedQuizIds.length === filteredQuizzes.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-outline focus:ring-primary text-primary"
+                      />
+                    )}
                   </th>
                   <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Quiz Name</th>
                   <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Room Code</th>
-                  <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Participants</th>
-                  <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Avg. Score</th>
-                  <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">Status</th>
+                  <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">
+                    {isTeacher ? "Participants" : "Status"}
+                  </th>
+                  <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">
+                    {isTeacher ? "Avg. Score" : "My Score"}
+                  </th>
+                  <th className="px-6 py-4 font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant">
+                    {isTeacher ? "Status" : "Result"}
+                  </th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -951,6 +1041,13 @@ export default function Reports() {
                 {filteredQuizzes.length > 0 ? filteredQuizzes.map((quiz) => {
                   const qStats = getQuizStats(quiz);
                   const isSelected = selectedQuizIds.includes(quiz.id!);
+                  const pCount = qStats.count;
+                  const myResponse = (allParticipants || []).find(p => p.quizId === quiz.id);
+                  const myScore = myResponse?.score || 0;
+                  const myPercentage = (quiz.drawCount || quiz.totalQuestions) > 0 
+                    ? (myScore / (quiz.drawCount || quiz.totalQuestions) * 100) 
+                    : 0;
+
                   return (
                     <tr 
                       key={quiz.id} 
@@ -961,57 +1058,87 @@ export default function Reports() {
                       )}
                     >
                       <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
-                        <input 
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelectQuiz(quiz.id!)}
-                          className="w-4 h-4 rounded border-outline focus:ring-primary text-primary"
-                        />
+                        {isTeacher && (
+                          <input 
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectQuiz(quiz.id!)}
+                            className="w-4 h-4 rounded border-outline focus:ring-primary text-primary"
+                          />
+                        )}
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                            isSelected ? "bg-primary text-white" : "bg-primary/10 text-primary"
+                          )}>
                             <BarChart3 className="w-5 h-5" />
                           </div>
-                          <span className="font-headline font-bold text-on-surface">{quiz.title}</span>
+                          <span className="font-headline font-bold text-on-surface line-clamp-1">{quiz.title}</span>
                         </div>
                       </td>
                       <td className="px-6 py-5 text-on-surface-variant font-body text-sm font-mono">{quiz.roomCode}</td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-outline" />
-                          <span className="font-body font-medium text-on-surface">{qStats.count}</span>
+                          {isTeacher ? (
+                            <>
+                              <Users className="w-4 h-4 text-outline" />
+                              <span className="font-body font-medium text-on-surface">{pCount}</span>
+                            </>
+                          ) : (
+                            <span className={cn(
+                                "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                                myResponse ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
+                            )}>
+                              {myResponse ? myResponse.status : "Pending"}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="w-full max-w-[100px] h-2 bg-surface-container-high rounded-full overflow-hidden">
-                          <div className="h-full bg-primary rounded-full" style={{ width: `${qStats.avgPercentage}%` }}></div>
+                        <div className="w-full max-w-[100px] h-2 bg-surface-container-high rounded-full overflow-hidden mb-1">
+                          <div 
+                            className="h-full bg-primary rounded-full transition-all duration-1000" 
+                            style={{ width: `${isTeacher ? qStats.avgPercentage : myPercentage}%` }}
+                          ></div>
                         </div>
-                        <span className="text-xs font-label font-bold text-primary mt-1 block">
-                          {qStats.avgRawScore}/{quiz.drawCount || quiz.totalQuestions}
+                        <span className="text-xs font-label font-bold text-primary block">
+                          {isTeacher ? qStats.avgRawScore : myScore}/{quiz.drawCount || quiz.totalQuestions}
                         </span>
                       </td>
                       <td className="px-6 py-5">
-                        <span className={cn(
-                          "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest",
-                          quiz.isActive ? "bg-primary/10 text-primary" : "bg-emerald-500/10 text-emerald-600"
-                        )}>
-                          {quiz.isActive ? "Active" : "Completed"}
-                        </span>
+                        {isTeacher ? (
+                          <span className={cn(
+                            "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest",
+                            quiz.isActive ? "bg-primary/10 text-primary" : "bg-emerald-500/10 text-emerald-600"
+                          )}>
+                            {quiz.isActive ? "Active" : "Archived"}
+                          </span>
+                        ) : (
+                          <span className={cn(
+                            "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest",
+                            myResponse?.isDisqualified ? "bg-error text-white" : "bg-emerald-500/10 text-emerald-600"
+                          )}>
+                            {myResponse?.isDisqualified ? "Disqualified" : "Completed"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowDeleteConfirm(quiz.id || null);
-                            }}
-                            disabled={quiz.isActive}
-                            className="p-2 rounded-lg hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors disabled:opacity-30"
-                            title="Delete Quiz"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {isTeacher && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDeleteConfirm(quiz.id || null);
+                              }}
+                              disabled={quiz.isActive}
+                              className="p-2 rounded-lg hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors disabled:opacity-30"
+                              title="Delete Quiz"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                           <button className="p-2 rounded-lg hover:bg-surface-container-high transition-colors group-hover:text-primary">
                             <ChevronRight className="w-5 h-5" />
                           </button>

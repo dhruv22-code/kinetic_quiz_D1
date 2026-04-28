@@ -117,6 +117,16 @@ service cloud.firestore {
       }
     }
 
+    // Collection Group rule for student attempt history
+    match /{path=**}/responses/{roll} {
+      allow list: if isSignedIn() && (
+        resource.data.get('studentId', '') == request.auth.uid || 
+        // Allow teachers to see all responses for their quizzes
+        get(/databases/$(database)/documents/quizzes/$(resource.data.get('quizId', ''))).data.authorId == request.auth.uid
+      );
+      allow get: if true; // Nested rules allow this, but explicit group allow is safer
+    }
+
     function isValidUser(data) {
       let required = ['id', 'full_name', 'username', 'avatar_url', 'bio', 'department', 'role', 'updated_at'];
       // Normalize allowed roles to include 'educator' used by some parts of the app

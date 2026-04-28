@@ -1,6 +1,6 @@
 import TopAppBar from "@/src/components/TopAppBar";
 import BottomNavBar from "@/src/components/BottomNavBar";
-import { Copy, Download, PlusCircle, Radio, Search, ArrowRight, Award, Info, Rocket, QrCode, X } from "lucide-react";
+import { Copy, Download, Plus, PlusCircle, Radio, Search, ArrowRight, Award, Info, Rocket, QrCode, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { QRCodeSVG } from 'qrcode.react';
 import { useQuiz, LOBBY_COUNTDOWN_SECONDS } from "@/src/context/QuizContext";
@@ -10,14 +10,18 @@ import { useAuth } from "../context/AuthContext";
 import { useState, useEffect } from "react";
 
 export default function Dashboard() {
-  const { quiz, participants, loading, endQuiz, startSession, cancelStart } = useQuiz();
+  const { quiz, quizzes, participants, loading, endQuiz, startSession, cancelStart, selectQuiz } = useQuiz();
   const { profile } = useAuth();
   const [roomCode, setRoomCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showRevertConfirm, setShowRevertConfirm] = useState(false);
+  const [showSwitchQuiz, setShowSwitchQuiz] = useState(false);
   const navigate = useNavigate();
+
+  const activeQuizzes = quizzes.filter(q => q.isActive);
+  const otherActiveQuizzes = activeQuizzes.filter(q => q.id !== quiz?.id);
 
   // Lobby countdown state for teacher
   const [lobbyCountdown, setLobbyCountdown] = useState<number | null>(null);
@@ -167,6 +171,8 @@ export default function Dashboard() {
   }
 
   if (!quiz) {
+    const hasActiveQuizzes = activeQuizzes.length > 0;
+
     return (
       <div className="bg-surface min-h-screen pb-24 overflow-x-hidden pt-24 md:pt-28">
         <TopAppBar />
@@ -176,17 +182,53 @@ export default function Dashboard() {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-surface-container-lowest p-12 rounded-3xl shadow-sm border border-surface-container max-w-lg w-full"
           >
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <PlusCircle className="w-10 h-10 text-primary" />
-            </div>
-            <h2 className="font-headline text-3xl font-extrabold mb-4">No Active Quiz</h2>
-            <p className="text-on-surface-variant mb-8">You haven't created any live sessions yet. Start by building a new quiz for your students.</p>
-            <Link 
-              to="/quiz-editor"
-              className="inline-flex items-center justify-center px-8 py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
-            >
-              Create New Quiz
-            </Link>
+            {hasActiveQuizzes ? (
+              <>
+                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Radio className="w-10 h-10 text-primary animate-pulse" />
+                </div>
+                <h2 className="font-headline text-3xl font-extrabold mb-4">Active Sessions</h2>
+                <p className="text-on-surface-variant mb-8 text-sm">You have {activeQuizzes.length} live sessions running. Select one to monitor responses.</p>
+                
+                <div className="space-y-3 mb-8">
+                  {activeQuizzes.map(q => (
+                    <button
+                      key={q.id}
+                      onClick={() => selectQuiz(q.id!)}
+                      className="w-full p-5 bg-surface-container-low hover:bg-surface-container border border-outline-variant/10 rounded-2xl flex items-center justify-between group transition-all"
+                    >
+                      <div className="text-left">
+                        <div className="font-bold text-on-surface group-hover:text-primary transition-colors">{q.title}</div>
+                        <div className="text-xs font-black font-headline text-primary/60 tracking-widest">{q.roomCode}</div>
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-outline group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                    </button>
+                  ))}
+                </div>
+
+                <Link 
+                  to="/quiz-editor"
+                  className="inline-flex items-center justify-center gap-2 text-primary font-bold hover:underline"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Host another quiz
+                </Link>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <PlusCircle className="w-10 h-10 text-primary" />
+                </div>
+                <h2 className="font-headline text-3xl font-extrabold mb-4">No Active Quiz</h2>
+                <p className="text-on-surface-variant mb-8">You haven't created any live sessions yet. Start by building a new quiz for your students.</p>
+                <Link 
+                  to="/quiz-editor"
+                  className="inline-flex items-center justify-center px-8 py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+                >
+                  Create New Quiz
+                </Link>
+              </>
+            )}
           </motion.div>
         </main>
         <BottomNavBar />
@@ -205,7 +247,7 @@ export default function Dashboard() {
   participants.forEach(p => {
     if (p.answers) {
       Object.entries(p.answers).forEach(([qId, selectedOption]) => {
-        const question = quiz.questions?.find(q => q.id === qId);
+        const question = (quiz.questions || []).find(q => q.id === qId);
         if (question?.type !== 'Paragraph') {
           if (question?.correctOption === selectedOption) totalCorrect++;
           totalAnswered++;
@@ -237,16 +279,28 @@ export default function Dashboard() {
       
       <main className="max-w-screen-2xl mx-auto px-6 pt-8">
         {/* Live Session Status */}
-        <section className="mb-8">
-          <div className="flex items-center gap-2 text-primary font-bold tracking-widest text-xs uppercase mb-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            </span>
-            Live Session Active
+        <section className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-primary font-bold tracking-widest text-xs uppercase mb-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+              Live Session Active
+            </div>
+            <h2 className="font-headline text-4xl font-extrabold tracking-tight">Student Responses</h2>
+            <p className="text-on-surface-variant mt-1">Quiz: {quiz.title}</p>
           </div>
-          <h2 className="font-headline text-4xl font-extrabold tracking-tight">Student Responses</h2>
-          <p className="text-on-surface-variant mt-1">Quiz: {quiz.title}</p>
+          
+          <div className="flex items-center gap-3">
+            <Link 
+              to="/quiz-editor"
+              className="px-6 py-3 bg-primary text-on-primary font-black font-headline text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Host Another Quiz
+            </Link>
+          </div>
         </section>
 
         {/* Session Code Card */}
@@ -258,6 +312,54 @@ export default function Dashboard() {
           <div className="w-full lg:w-auto">
             <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Room Code</span>
             <div className="text-4xl xs:text-5xl font-black font-headline text-primary tracking-tight">{quiz.roomCode}</div>
+            
+            {otherActiveQuizzes.length > 0 && (
+              <div className="mt-4 relative">
+                <button 
+                  onClick={() => setShowSwitchQuiz(!showSwitchQuiz)}
+                  className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  Switch to Another Active Room ({otherActiveQuizzes.length})
+                </button>
+                
+                <AnimatePresence>
+                  {showSwitchQuiz && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute top-full left-0 mt-2 w-72 bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant/10 z-50 overflow-hidden"
+                    >
+                      <div className="p-4 border-b border-outline-variant/5 bg-surface-container-low">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Active Sessions</span>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto">
+                        {otherActiveQuizzes.map(q => (
+                          <button
+                            key={q.id}
+                            onClick={() => {
+                              selectQuiz(q.id!);
+                              setShowSwitchQuiz(false);
+                            }}
+                            className="w-full p-4 text-left hover:bg-surface-container-low transition-colors flex items-center justify-between border-b border-outline-variant/5 last:border-0"
+                          >
+                            <div>
+                              <div className="font-bold text-sm text-on-surface truncate pr-2">{q.title}</div>
+                              <div className="text-[10px] font-black font-headline text-primary tracking-widest">{q.roomCode}</div>
+                            </div>
+                            <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center">
+                              <ArrowRight className="w-4 h-4 text-primary" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-on-surface-variant">
               <span className="font-bold shrink-0">Live Link:</span>
               <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded max-w-[200px] xs:max-w-xs overflow-hidden">
@@ -622,83 +724,105 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
-        {/* Class List Table */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-surface-container-lowest rounded-3xl shadow-[0_20px_40px_rgba(42,43,81,0.03)] overflow-hidden"
-        >
-          <div className="p-8 border-b border-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <h3 className="font-headline text-2xl font-bold">Class List</h3>
-          </div>
-          <div className="overflow-x-auto">
-            {participants.length > 0 ? (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-surface-container-low/50">
-                    <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Student</th>
-                    <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Roll Number</th>
-                    <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-center">Score</th>
-                    <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-center">Current Progress</th>
-                    <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-surface-container">
-                  {participants.map((student, index) => (
-                    <tr key={student.roll || `student-row-${index}`} className="group hover:bg-surface-container-low/30 transition-colors">
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">{index + 1}</div>
-                          <span className="font-headline font-bold">{student.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <span className="font-medium text-sm text-on-surface-variant">{student.roll}</span>
-                      </td>
-                      <td className="px-8 py-6 text-center">
-                        <span className="font-headline font-black text-primary">
-                          {student.score !== undefined ? truncateScore(student.score) : '-'}<span className="text-[10px] text-on-surface-variant/50 ml-0.5">/{totalScorable}</span>
-                        </span>
-                      </td>
-                      <td className="px-8 py-6 text-center">
-                        <span className="bg-surface-container-highest px-3 py-1 rounded-full text-xs font-bold text-on-surface-variant">
-                          Question {student.progress + 1}/{quiz.totalQuestions}
-                        </span>
-                      </td>
-                      <td className="px-8 py-6 text-right">
-                        <div className={cn(
-                          "flex items-center justify-end gap-2 font-bold text-sm",
-                          student.status === 'Submitted' ? 'text-emerald-600' : 'text-primary'
-                        )}>
-                          <span className={cn(
-                            "w-2 h-2 rounded-full",
-                            student.status === 'Submitted' ? 'bg-emerald-500' : (
-                              (student.lastSeen && Date.now() - student.lastSeen < 30000) ? 'bg-emerald-500 animate-pulse' : 'bg-outline-variant'
-                            )
-                          )}></span>
-                          {student.status === 'Submitted' ? 'Submitted' : (
-                            (student.lastSeen && Date.now() - student.lastSeen < 30000) ? 'Online' : 'Offline'
-                          )}
-                        </div>
-                      </td>
+        {/* Class List Table - Only visible in lobby mode (waiting) */}
+        {quiz.status === 'waiting' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-surface-container-lowest rounded-3xl shadow-[0_20px_40px_rgba(42,43,81,0.03)] overflow-hidden"
+          >
+            <div className="p-8 border-b border-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h3 className="font-headline text-2xl font-bold">Class List</h3>
+            </div>
+            <div className="overflow-x-auto">
+              {participants.length > 0 ? (
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-surface-container-low/50">
+                      <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Student</th>
+                      <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Roll Number</th>
+                      <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-center">Score</th>
+                      <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-center">Current Progress</th>
+                      <th className="px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="p-20 text-center">
-                <div className="w-16 h-16 bg-surface-container-low rounded-full flex items-center justify-center mx-auto mb-4">
-                  <PlusCircle className="w-8 h-8 text-outline-variant" />
+                  </thead>
+                  <tbody className="divide-y divide-surface-container">
+                    {participants.map((student, index) => (
+                      <tr key={student.roll || `student-row-${index}`} className="group hover:bg-surface-container-low/30 transition-colors">
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">{index + 1}</div>
+                            <span className="font-headline font-bold">{student.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <span className="font-medium text-sm text-on-surface-variant">{student.roll}</span>
+                        </td>
+                        <td className="px-8 py-6 text-center">
+                          <span className="font-headline font-black text-primary">
+                            {student.score !== undefined ? truncateScore(student.score) : '-'}<span className="text-[10px] text-on-surface-variant/50 ml-0.5">/{totalScorable}</span>
+                          </span>
+                        </td>
+                        <td className="px-8 py-6 text-center">
+                          <span className="bg-surface-container-highest px-3 py-1 rounded-full text-xs font-bold text-on-surface-variant">
+                            Question {student.progress + 1}/{quiz.totalQuestions}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <div className={cn(
+                            "flex items-center justify-end gap-2 font-bold text-sm",
+                            student.status === 'Submitted' ? 'text-emerald-600' : 'text-primary'
+                          )}>
+                            <span className={cn(
+                              "w-2 h-2 rounded-full",
+                              student.status === 'Submitted' ? 'bg-emerald-500' : (
+                                (student.lastSeen && Date.now() - student.lastSeen < 30000) ? 'bg-emerald-500 animate-pulse' : 'bg-outline-variant'
+                              )
+                            )}></span>
+                            {student.status === 'Submitted' ? 'Submitted' : (
+                              (student.lastSeen && Date.now() - student.lastSeen < 30000) ? 'Online' : 'Offline'
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="p-20 text-center">
+                  <div className="w-16 h-16 bg-surface-container-low rounded-full flex items-center justify-center mx-auto mb-4">
+                    <PlusCircle className="w-8 h-8 text-outline-variant" />
+                  </div>
+                  <p className="text-on-surface-variant font-medium">No students have joined yet.</p>
+                  <p className="text-xs text-outline-variant mt-1">Share the room code to start the session.</p>
                 </div>
-                <p className="text-on-surface-variant font-medium">No students have joined yet.</p>
-                <p className="text-xs text-outline-variant mt-1">Share the room code to start the session.</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
       </main>
 
       <BottomNavBar />
+
+      {/* Floating Action Button for Teachers */}
+      {!isStudent && (
+        <div className="fixed bottom-24 right-6 z-40 md:bottom-10 md:right-10 overflow-visible">
+          <Link
+            to="/quiz-editor"
+            className="group relative flex items-center justify-center w-14 h-14 md:w-16 md:h-16 bg-primary text-on-primary rounded-2xl shadow-xl shadow-primary/30 hover:scale-110 active:scale-95 transition-all"
+            title="Create New Quiz"
+          >
+            <Plus className="w-8 h-8 md:w-10 md:h-10 transition-transform group-hover:rotate-90" />
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              whileHover={{ opacity: 1, x: -10 }}
+              className="absolute right-full mr-4 hidden md:flex items-center px-4 py-2 bg-on-surface text-surface text-xs font-black font-headline uppercase tracking-widest rounded-xl whitespace-nowrap pointer-events-none"
+            >
+              Host New Session
+            </motion.div>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
