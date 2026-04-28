@@ -181,10 +181,10 @@ export default function StudentJoin() {
   };
 
   return (
-    <div className="bg-surface min-h-screen pb-24 flex flex-col pt-24 md:pt-28">
+    <div className="bg-surface min-h-screen flex flex-col pt-20 md:pt-28 pb-32 overflow-x-hidden">
       <TopAppBar />
       
-      <main className="flex-grow flex flex-col items-center px-6 py-12 md:py-20 relative">
+      <main className="flex-grow flex flex-col items-center px-4 md:px-6 py-8 md:py-16 relative">
         <div className="absolute top-6 right-6 z-20">
           <ThemeToggle />
         </div>
@@ -194,7 +194,7 @@ export default function StudentJoin() {
         
         <div className="w-full max-w-lg">
           <div className="text-left mb-10">
-            <h2 className="font-headline text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight mb-4">Join Quiz Room</h2>
+            <h2 className="font-headline text-3xl md:text-5xl font-extrabold text-on-surface tracking-tight mb-4">Join Quiz Room</h2>
             <p className="text-on-surface-variant text-lg max-w-md">Enter your details and the unique 6-digit code provided by the organizer.</p>
           </div>
 
