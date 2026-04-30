@@ -726,6 +726,7 @@ export default function QuizEditor() {
             <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-3 font-label">Quiz Title</label>
             <input 
               value={title}
+              onFocus={(e) => e.target.select()}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full bg-transparent border-0 border-b-2 border-outline-variant/30 focus:border-primary focus:ring-0 text-2xl font-bold font-headline placeholder:text-outline-variant transition-all pb-2" 
               placeholder="e.g., HCI" 
@@ -747,6 +748,7 @@ export default function QuizEditor() {
                   <span className="text-sm font-medium">Draw for Student</span>
                   <input 
                     value={drawCount}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       setHasManuallySetDrawCount(true);
@@ -768,6 +770,7 @@ export default function QuizEditor() {
                     <div className="flex items-center gap-2">
                       <input 
                         value={defaultTimer}
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => setDefaultTimer(Number(e.target.value))}
                         className="w-16 bg-surface-container-lowest border-0 rounded-lg text-center font-bold text-secondary focus:ring-2 focus:ring-secondary-container" 
                         type="number" 
@@ -806,6 +809,7 @@ export default function QuizEditor() {
             <div className="flex gap-2 w-full sm:w-auto">
               <input 
                 value={newPattern}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => setNewPattern(e.target.value)}
                 placeholder="e.g. 2023-IMG-001-061"
                 className="flex-grow sm:flex-none bg-surface-container-lowest border-0 rounded-lg text-sm px-4 py-2 focus:ring-2 focus:ring-primary-container w-full sm:w-48"
@@ -898,6 +902,7 @@ export default function QuizEditor() {
                         className="w-12 bg-transparent border-0 text-center text-xl font-bold p-0 focus:ring-0" 
                         type="number" 
                         value={q.timer} 
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => handleUpdateQuestion(q.id, { timer: Number(e.target.value) })}
                       />
                       <span className="text-sm font-bold text-on-surface-variant">s</span>
@@ -1108,6 +1113,7 @@ export default function QuizEditor() {
                               type="text" 
                               disabled={q.type === "True/False"}
                               value={q.options[label as keyof typeof q.options] || ""}
+                              onFocus={(e) => e.target.select()}
                               onChange={(e) => {
                                 const newOptions = { ...q.options, [label]: e.target.value };
                                 handleUpdateQuestion(q.id, { options: newOptions });
